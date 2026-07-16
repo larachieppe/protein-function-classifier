@@ -1,27 +1,28 @@
 model:
   # ESM-2 sizes (accuracy vs. compute trade-off):
-  #   facebook/esm2_t6_8M_UR50D    -  8M  fast local smoke tests
-  #   facebook/esm2_t30_150M_UR50D - 150M sweet spot on a free Colab T4  (default)
-  #   facebook/esm2_t33_650M_UR50D - 650M best accuracy; needs grad checkpointing + small batch
-  name: facebook/esm2_t30_150M_UR50D
+  #   facebook/esm2_t30_150M_UR50D - 150M  fast; good for local runs
+  #   facebook/esm2_t33_650M_UR50D - 650M  best accuracy (needs a real GPU)  (default)
+  name: facebook/esm2_t33_650M_UR50D
   num_labels: 10
   dropout: 0.1
+  head: attention                    # 'attention' (learnable residue pooling) or 'cls' (baseline)
 
 training:
   output_dir: outputs/
-  num_epochs: 3                      # pLMs fine-tune fast; 3-4 epochs is plenty
-  batch_size: 8
-  gradient_accumulation_steps: 2     # effective batch size 16
-  gradient_checkpointing: false      # set true for the 650M model on a T4
+  num_epochs: 5
+  batch_size: 4
+  gradient_accumulation_steps: 8     # effective batch size 32
+  gradient_checkpointing: true       # required to fit 650M on a 16GB GPU
   learning_rate: 0.00002
+  lr_scheduler_type: cosine
   warmup_ratio: 0.1
   weight_decay: 0.01
-  class_weighted_loss: true          # counter the Nucleus(35%) vs Peroxisome(0.8%) imbalance
+  class_weighted_loss: false         # OFF: optimize for accuracy (weighting trades acc for macro-F1)
   eval_strategy: epoch
   save_strategy: epoch
   load_best_model_at_end: true
-  metric_for_best_model: macro_f1    # honest metric for imbalanced multiclass
-  fp16: true                         # T4 supports it; set false on CPU/MPS
+  metric_for_best_model: accuracy    # target metric
+  fp16: true                         # set false on CPU/MPS
 
 data:
   train_path: data/train.csv
@@ -29,8 +30,8 @@ data:
   test_path: data/test.csv
   sequence_col: sequence
   label_col: label
-  max_length: 512                    # covers ~59% of sequences fully; 1024 covers ~89%
+  max_length: 1024                   # full context; dual-end truncation keeps both termini
 
 logging:
-  wandb_project: null                # set to a project name to enable W&B tracking
+  wandb_project: null
   wandb_entity: null

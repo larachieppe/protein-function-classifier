@@ -13,10 +13,10 @@ from sklearn.metrics import (
     precision_recall_curve, average_precision_score,
     ConfusionMatrixDisplay, confusion_matrix,
 )
-from transformers import TrainingArguments, Trainer
+from transformers import TrainingArguments, Trainer, DataCollatorWithPadding
 
 from data import load_splits, build_label_maps, tokenize_dataset, get_tokenizer
-from model import build_model
+from model import build_model, build_attention_model
 
 
 def compute_metrics(eval_pred):
@@ -28,23 +28,6 @@ def compute_metrics(eval_pred):
         "weighted_f1": f1_score(labels, preds, average="weighted"),
         "mcc": matthews_corrcoef(labels, preds),
     }
-
-
-class WeightedTrainer(Trainer):
-    """Trainer with a class-weighted cross-entropy loss to counter imbalance."""
-
-    def __init__(self, *args, class_weights=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.class_weights = class_weights
-
-    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
-        labels = inputs.pop("labels")
-        outputs = model(**inputs)
-        weight = None
-        if self.class_weights is not None:
-            weight = self.class_weights.to(outputs.logits.device)
-        loss = nn.functional.cross_entropy(outputs.logits, labels, weight=weight)
-        return (loss, outputs) if return_outputs else loss
 
 
 def _class_weights(train_df, label2id):
@@ -75,11 +58,15 @@ def main(config_path="configs/config.yaml"):
     val_ds = tokenize_dataset(val_df, tokenizer, label2id, dcfg["max_length"])
     test_ds = tokenize_dataset(test_df, tokenizer, label2id, dcfg["max_length"])
 
-    model = build_model(mcfg["name"], num_labels, label2id, id2label)
+    class_weights = _class_weights(train_df, label2id).tolist() if tcfg.get("class_weighted_loss") else None
+
+    if mcfg.get("head", "attention") == "attention":
+        model = build_attention_model(mcfg["name"], num_labels, label2id, id2label,
+                                      dropout=mcfg.get("dropout", 0.1), class_weights=class_weights)
+    else:
+        model = build_model(mcfg["name"], num_labels, label2id, id2label)
     if tcfg.get("gradient_checkpointing"):
         model.gradient_checkpointing_enable()
-
-    class_weights = _class_weights(train_df, label2id) if tcfg.get("class_weighted_loss") else None
 
     args = TrainingArguments(
         output_dir=tcfg["output_dir"],
@@ -88,6 +75,7 @@ def main(config_path="configs/config.yaml"):
         per_device_eval_batch_size=tcfg["batch_size"],
         gradient_accumulation_steps=tcfg.get("gradient_accumulation_steps", 1),
         learning_rate=tcfg["learning_rate"],
+        lr_scheduler_type=tcfg.get("lr_scheduler_type", "linear"),
         warmup_ratio=tcfg.get("warmup_ratio", 0.0),
         weight_decay=tcfg["weight_decay"],
         logging_steps=10,
@@ -96,19 +84,19 @@ def main(config_path="configs/config.yaml"):
         load_best_model_at_end=tcfg["load_best_model_at_end"],
         metric_for_best_model=tcfg["metric_for_best_model"],
         greater_is_better=True,
-        save_total_limit=2,
+        save_total_limit=1,
         fp16=tcfg["fp16"],
         report_to="wandb" if lcfg.get("wandb_project") else "none",
         run_name=lcfg.get("wandb_project"),
     )
 
-    trainer = WeightedTrainer(
+    trainer = Trainer(
         model=model,
         args=args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         compute_metrics=compute_metrics,
-        class_weights=class_weights,
+        data_collator=DataCollatorWithPadding(tokenizer),
     )
 
     trainer.train()
@@ -120,7 +108,12 @@ def main(config_path="configs/config.yaml"):
             print(f"  {k}: {v:.4f}")
 
     best_dir = os.path.join(tcfg["output_dir"], "best_model")
-    model.save_pretrained(best_dir)
+    os.makedirs(best_dir, exist_ok=True)
+    if hasattr(model, "save_pretrained"):
+        model.save_pretrained(best_dir)
+    else:
+        torch.save(model.state_dict(), os.path.join(best_dir, "pytorch_model.bin"))
+        model.config.save_pretrained(best_dir)
     tokenizer.save_pretrained(best_dir)
 
     _plot_results(trainer, test_ds, id2label, tcfg["output_dir"], results)
