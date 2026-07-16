@@ -140,9 +140,7 @@
   </header>
 
   <div class="stats" id="stats"></div>
-  <p class="caption">Baseline: a <b>frozen</b> ESM-2 (35M) with logistic regression on top —
-    zero task-specific fine-tuning. Random guessing ≈ 10%; always predicting the majority
-    class (Nucleus) ≈ 33%. Every number on this page is computed from real test-set predictions.</p>
+  <p class="caption" id="method-note"></p>
 
   <section>
     <div class="sec-head">
@@ -234,6 +232,9 @@
   document.getElementById('badge-text').innerHTML =
     `Measured on ${R.metrics.n_test.toLocaleString()} held-out proteins · ${R.dataset.n_classes} compartments`;
   document.getElementById('foot-model').textContent = 'Model: ' + R.model;
+  document.getElementById('method-note').innerHTML =
+    `Method: <b>${R.source}</b>. Random guessing ≈ 10%; always predicting the majority `+
+    `class (Nucleus) ≈ 33%. Every number on this page is computed from real test-set predictions.`;
   const stats = [
     ['Accuracy', pct(R.metrics.accuracy), 'vs. 10% chance'],
     ['Macro-F1', R.metrics.macro_f1.toFixed(3), 'all classes equal weight'],
