@@ -1,0 +1,8 @@
+{
+  "model": "facebook/esm2_t12_35M_UR50D",
+  "method": "frozen ESM-2 embeddings + logistic regression",
+  "accuracy": 0.6492942453854506,
+  "macro_f1": 0.5230306120647491,
+  "weighted_f1": 0.6611533719004506,
+  "mcc": 0.5773126495784984
+}

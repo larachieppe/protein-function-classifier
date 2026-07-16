@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protein Subcellular Localization — ESM-2</title>
+<style>
+  :root{
+    color-scheme: light;
+    --plane:#f4f4f1; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --baseline:#c3c2b7; --border:rgba(11,11,11,.10);
+    --blue:#2a78d6; --blue-050:#eef4fb; --blue-700:#0d366b;
+    --good:#0ca30c; --bad:#e34948;
+    /* 10 validated categorical hues (CVD worst-adjacent ΔE 17.8) */
+    --c0:#2a78d6; --c1:#1baf7a; --c2:#eda100; --c3:#008300; --c4:#4a3aa7;
+    --c5:#e34948; --c6:#e87ba4; --c7:#eb6834; --c8:#8a4b0f; --c9:#12b5c9;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--plane); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    line-height:1.55; font-size:16px;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 20px}
+  a{color:var(--blue); text-decoration:none}
+  a:hover{text-decoration:underline}
+  h1,h2,h3{line-height:1.2; margin:0}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ── header ── */
+  header{padding:64px 0 40px}
+  .eyebrow{color:var(--blue); font-weight:650; font-size:13px; letter-spacing:.08em; text-transform:uppercase}
+  header h1{font-size:clamp(28px,4.5vw,46px); font-weight:750; margin:.3em 0 .35em; letter-spacing:-.02em}
+  header p.lede{font-size:clamp(17px,2.2vw,20px); color:var(--ink2); max-width:60ch; margin:0}
+  .badge{display:inline-flex; align-items:center; gap:7px; margin-top:22px; padding:7px 13px;
+    background:var(--surface); border:1px solid var(--border); border-radius:999px; font-size:13.5px; color:var(--ink2)}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--good)}
+
+  /* ── stat tiles ── */
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:36px 0 8px}
+  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .tile{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px}
+  .tile .v{font-size:34px; font-weight:730; letter-spacing:-.02em}
+  .tile .k{font-size:13px; color:var(--muted); margin-top:2px}
+  .tile .sub{font-size:12px; color:var(--muted); margin-top:6px}
+
+  /* ── sections / cards ── */
+  section{padding:34px 0}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px}
+  .card + .card{margin-top:20px}
+  .sec-head{margin-bottom:6px}
+  .sec-head h2{font-size:22px; font-weight:700; letter-spacing:-.01em}
+  .sec-head p{color:var(--ink2); margin:.4em 0 0; max-width:70ch; font-size:15px}
+  .caption{color:var(--muted); font-size:13px; margin-top:14px; max-width:74ch}
+
+  /* ── embedding scatter ── */
+  .scatter-tools{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px}
+  .seg{display:inline-flex; background:var(--plane); border:1px solid var(--border); border-radius:9px; padding:3px}
+  .seg button{border:0; background:transparent; font:inherit; font-size:13px; color:var(--ink2);
+    padding:6px 12px; border-radius:6px; cursor:pointer}
+  .seg button.on{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.06); font-weight:600}
+  .hint{color:var(--muted); font-size:12.5px; margin-left:auto}
+  #scatter-box{position:relative; width:100%; aspect-ratio:16/10; min-height:320px}
+  canvas{width:100%; height:100%; display:block; border-radius:10px}
+  .legend{display:flex; flex-wrap:wrap; gap:6px 8px; margin-top:16px}
+  .lg{display:inline-flex; align-items:center; gap:7px; padding:5px 10px; border:1px solid var(--border);
+    border-radius:999px; background:var(--plane); cursor:pointer; font-size:12.5px; color:var(--ink2); user-select:none}
+  .lg .sw{width:11px; height:11px; border-radius:3px; flex:none}
+  .lg.off{opacity:.38}
+  .lg .n{color:var(--muted); font-variant-numeric:tabular-nums}
+  .tooltip{position:absolute; pointer-events:none; background:var(--ink); color:#fff; font-size:12.5px;
+    padding:8px 10px; border-radius:8px; opacity:0; transition:opacity .08s; white-space:nowrap; z-index:5; transform:translate(-50%,-120%)}
+  .tooltip b{font-weight:650}
+
+  /* ── bars (per-class F1) ── */
+  .bars{display:flex; flex-direction:column; gap:9px; margin-top:6px}
+  .bar-row{display:grid; grid-template-columns:170px 1fr 48px; align-items:center; gap:12px; font-size:13.5px}
+  @media(max-width:560px){.bar-row{grid-template-columns:120px 1fr 42px}}
+  .bar-row .lab{color:var(--ink2); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .track{height:22px; background:var(--plane); border-radius:6px; overflow:hidden; position:relative}
+  .fill{height:100%; background:var(--blue); border-radius:0 4px 4px 0; transition:width .5s cubic-bezier(.2,.7,.2,1)}
+  .bar-row .val{font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600; text-align:right}
+  .bar-row:hover .track{outline:2px solid var(--border)}
+
+  /* ── confusion matrix ── */
+  .cm-scroll{overflow-x:auto; margin-top:8px}
+  table.cm{border-collapse:separate; border-spacing:2px; margin:0 auto}
+  table.cm th{font-weight:500; font-size:11.5px; color:var(--muted)}
+  table.cm th.col{writing-mode:vertical-rl; transform:rotate(180deg); vertical-align:bottom; height:96px; padding:0 2px}
+  table.cm th.row{text-align:right; padding-right:8px; white-space:nowrap}
+  table.cm td{width:38px; height:38px; text-align:center; border-radius:5px; font-size:11px;
+    font-variant-numeric:tabular-nums; cursor:default; color:var(--ink)}
+  .cm-axis{font-size:12px; color:var(--muted); text-align:center; margin-top:4px}
+
+  /* ── distribution ── */
+  .dist{display:flex; flex-direction:column; gap:7px}
+  .dist-row{display:grid; grid-template-columns:170px 1fr 96px; align-items:center; gap:12px; font-size:13px}
+  @media(max-width:560px){.dist-row{grid-template-columns:120px 1fr 78px}}
+  .dist-row .lab{color:var(--ink2); text-align:right}
+  .dist-row .track{height:16px}
+  .dist-row .fill{background:var(--baseline)}
+  .dist-row .val{color:var(--muted); font-variant-numeric:tabular-nums; font-size:12px}
+
+  /* ── examples ── */
+  .ex-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px}
+  @media(max-width:720px){.ex-grid{grid-template-columns:1fr}}
+  .ex{border:1px solid var(--border); border-radius:12px; padding:16px; background:var(--surface)}
+  .ex-top{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+  .chip{display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--ink)}
+  .chip .sw{width:10px; height:10px; border-radius:3px}
+  .ex .meta{margin-left:auto; color:var(--muted); font-size:12px}
+  .seq{font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:11.5px; color:var(--ink2);
+    background:var(--plane); border-radius:7px; padding:9px 11px; word-break:break-all; line-height:1.5}
+  .p3{margin-top:11px; display:flex; flex-direction:column; gap:5px}
+  .p3-row{display:grid; grid-template-columns:150px 1fr 44px; align-items:center; gap:9px; font-size:12px}
+  @media(max-width:560px){.p3-row{grid-template-columns:110px 1fr 40px}}
+  .p3-row .l{color:var(--ink2); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .p3-row .t{height:13px; background:var(--plane); border-radius:4px; overflow:hidden}
+  .p3-row .f{height:100%; background:var(--blue); border-radius:0 3px 3px 0}
+  .p3-row.top .f{background:var(--good)}
+  .p3-row .pv{text-align:right; font-variant-numeric:tabular-nums; color:var(--muted)}
+
+  footer{padding:44px 0 70px; color:var(--muted); font-size:13.5px; border-top:1px solid var(--border); margin-top:30px}
+  footer a{color:var(--ink2)}
+  .foot-links{display:flex; flex-wrap:wrap; gap:18px; margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Protein Language Models · ESM-2</div>
+    <h1>Where does a protein live in the cell?</h1>
+    <p class="lede">Predicting subcellular localization for 1,842 held-out proteins directly
+      from their amino-acid sequence, using Meta AI's ESM-2 protein language model on the
+      DeepLoc benchmark.</p>
+    <div class="badge"><span class="dot"></span><span id="badge-text">Loading measured results…</span></div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+  <p class="caption">Baseline: a <b>frozen</b> ESM-2 (35M) with logistic regression on top —
+    zero task-specific fine-tuning. Random guessing ≈ 10%; always predicting the majority
+    class (Nucleus) ≈ 33%. Every number on this page is computed from real test-set predictions.</p>
+
+  <section>
+    <div class="sec-head">
+      <h2>The embedding map</h2>
+      <p>Each protein is placed by a 2-D UMAP of its ESM-2 embedding. The model was never told
+        what "a mitochondrion" is — yet compartments already separate. Click a compartment to
+        isolate it; hover any point for its prediction.</p>
+    </div>
+    <div class="card">
+      <div class="scatter-tools">
+        <div class="seg" id="mode-seg">
+          <button data-mode="true" class="on">Color by compartment</button>
+          <button data-mode="correct">Correct vs. incorrect</button>
+        </div>
+        <span class="hint">hover a point · click legend to filter</span>
+      </div>
+      <div id="scatter-box">
+        <canvas id="scatter"></canvas>
+        <div class="tooltip" id="tip"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Per-class F1</h2>
+      <p>How well each compartment is recovered. Abundant, sequence-distinctive classes
+        (Nucleus, Extracellular, Plastid) score high; rare ones (Peroxisome — 49 training
+        examples) are hard, which is exactly why we report macro-F1, not just accuracy.</p>
+    </div>
+    <div class="card"><div class="bars" id="bars"></div></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Confusion matrix</h2>
+      <p>Row-normalized: each row is a true compartment, each column what the model predicted.
+        A strong diagonal is good. Hover a cell for exact counts.</p>
+    </div>
+    <div class="card">
+      <div class="cm-scroll"><table class="cm" id="cm"></table></div>
+      <div class="cm-axis">← predicted compartment →</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Class distribution</h2>
+      <p>The training set is heavily imbalanced. An inverse-frequency class-weighted loss keeps
+        rare compartments from being ignored.</p>
+    </div>
+    <div class="card"><div class="dist" id="dist"></div></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Example predictions</h2>
+      <p>The model's most confident correct call for each compartment, with its top-3 ranked
+        guesses. Sequences are truncated for display.</p>
+    </div>
+    <div class="ex-grid" id="examples"></div>
+  </section>
+
+  <footer>
+    <div>Built by fine-tuning <a href="https://huggingface.co/facebook/esm2_t30_150M_UR50D">ESM-2</a>
+      (Lin et al., 2023) on the <a href="https://services.healthtech.dtu.dk/services/DeepLoc-2.0/">DeepLoc</a>
+      benchmark (Almagro Armenteros et al., 2017). This page shows the measured frozen-embedding
+      baseline; fine-tuning improves on it.</div>
+    <div class="foot-links">
+      <span id="foot-model"></span>
+      <a href="https://huggingface.co/datasets/proteinea/deeploc">Dataset</a>
+    </div>
+  </footer>
+
+</div>
+
+<script src="results.js"></script>
+<script>
+(function(){
+  const R = window.RESULTS;
+  if(!R){document.getElementById('badge-text').textContent='results.js not found — run: python src/build_site.py';return;}
+  const PAL = ['#2a78d6','#1baf7a','#eda100','#008300','#4a3aa7','#e34948','#e87ba4','#eb6834','#8a4b0f','#12b5c9'];
+  const MUTED = '#d3d2cb';
+  const nice = s => s.replace(/\./g,' ');
+  const pct = x => (x*100).toFixed(1)+'%';
+
+  // ── badge + stats ──
+  document.getElementById('badge-text').innerHTML =
+    `Measured on ${R.metrics.n_test.toLocaleString()} held-out proteins · ${R.dataset.n_classes} compartments`;
+  document.getElementById('foot-model').textContent = 'Model: ' + R.model;
+  const stats = [
+    ['Accuracy', pct(R.metrics.accuracy), 'vs. 10% chance'],
+    ['Macro-F1', R.metrics.macro_f1.toFixed(3), 'all classes equal weight'],
+    ['MCC', R.metrics.mcc.toFixed(3), 'Matthews correlation'],
+    ['Proteins', R.metrics.n_test.toLocaleString(), 'held-out test set'],
+  ];
+  document.getElementById('stats').innerHTML = stats.map(([k,v,s])=>
+    `<div class="tile"><div class="v num">${v}</div><div class="k">${k}</div><div class="sub">${s}</div></div>`).join('');
+
+  // ── scatter ──
+  const cv = document.getElementById('scatter'), ctx = cv.getContext('2d'), tip = document.getElementById('tip');
+  const box = document.getElementById('scatter-box');
+  const P = R.points, C = R.classes;
+  let mode = 'true';                 // 'true' | 'correct'
+  const active = new Set();          // empty = show all
+  let W=0,H=0,dpr=1, pad=18;
+  const xs=P.map(p=>p.x), ys=P.map(p=>p.y);
+  const xmin=Math.min(...xs),xmax=Math.max(...xs),ymin=Math.min(...ys),ymax=Math.max(...ys);
+  const sx=v=>pad+(v-xmin)/(xmax-xmin)*(W-2*pad);
+  const sy=v=>H-pad-(v-ymin)/(ymax-ymin)*(H-2*pad);
+
+  function resize(){
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    W=box.clientWidth; H=box.clientHeight;
+    cv.width=W*dpr; cv.height=H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+  function colorFor(p){
+    if(mode==='correct') return p.t===p.p ? '#0ca30c' : '#e34948';
+    return PAL[p.t];
+  }
+  function shown(p){
+    if(mode==='correct') return true;
+    return active.size===0 || active.has(p.t);
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // faded (background) first
+    for(const p of P){ if(shown(p))continue;
+      ctx.fillStyle=MUTED; ctx.globalAlpha=.5;
+      ctx.beginPath(); ctx.arc(sx(p.x),sy(p.y),2.1,0,7); ctx.fill();
+    }
+    for(const p of P){ if(!shown(p))continue;
+      ctx.fillStyle=colorFor(p); ctx.globalAlpha=.72;
+      ctx.beginPath(); ctx.arc(sx(p.x),sy(p.y),3,0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  // hover
+  cv.addEventListener('mousemove',e=>{
+    const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+    let best=-1,bd=1e9;
+    for(let i=0;i<P.length;i++){ if(!shown(P[i]))continue;
+      const dx=sx(P[i].x)-mx, dy=sy(P[i].y)-my, d=dx*dx+dy*dy;
+      if(d<bd){bd=d;best=i;}
+    }
+    if(best>=0 && bd<90){
+      const p=P[best], ok=p.t===p.p;
+      tip.style.left=sx(p.x)+'px'; tip.style.top=sy(p.y)+'px'; tip.style.opacity=1;
+      tip.innerHTML=`<b>${nice(C[p.t])}</b><br>predicted ${nice(C[p.p])} `+
+        `<span style="color:${ok?'#7ee27e':'#f3a3a3'}">${ok?'✓':'✗'}</span><br>`+
+        `confidence ${pct(p.c)}`;
+    } else tip.style.opacity=0;
+  });
+  cv.addEventListener('mouseleave',()=>tip.style.opacity=0);
+
+  // legend
+  const counts=C.map(()=>0); P.forEach(p=>counts[p.t]++);
+  const legend=document.getElementById('legend');
+  legend.innerHTML=C.map((c,i)=>
+    `<span class="lg" data-i="${i}"><span class="sw" style="background:${PAL[i]}"></span>`+
+    `${nice(c)} <span class="n">${counts[i]}</span></span>`).join('');
+  legend.querySelectorAll('.lg').forEach(el=>{
+    el.addEventListener('click',()=>{
+      if(mode!=='true')return;
+      const i=+el.dataset.i;
+      if(active.has(i))active.delete(i); else active.add(i);
+      syncLegend(); draw();
+    });
+  });
+  function syncLegend(){
+    legend.querySelectorAll('.lg').forEach(el=>{
+      const i=+el.dataset.i;
+      el.classList.toggle('off', active.size>0 && !active.has(i) && mode==='true');
+      el.style.pointerEvents = mode==='true'?'auto':'none';
+      el.style.opacity = mode==='true' ? '' : '.4';
+    });
+  }
+  document.getElementById('mode-seg').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    mode=b.dataset.mode;
+    document.querySelectorAll('#mode-seg button').forEach(x=>x.classList.toggle('on',x===b));
+    syncLegend(); draw();
+  });
+  window.addEventListener('resize',resize);
+
+  // ── per-class F1 bars ──
+  const byF1=[...R.per_class].sort((a,b)=>b.f1-a.f1);
+  document.getElementById('bars').innerHTML=byF1.map(d=>
+    `<div class="bar-row" title="precision ${d.precision.toFixed(2)} · recall ${d.recall.toFixed(2)} · support ${d.support}">
+       <span class="lab">${nice(d.label)}</span>
+       <span class="track"><span class="fill" style="width:0" data-w="${(d.f1*100).toFixed(1)}%"></span></span>
+       <span class="val num">${d.f1.toFixed(2)}</span>
+     </div>`).join('');
+
+  // ── confusion matrix ──
+  const cm=R.confusion.normalized, cnt=R.confusion.counts;
+  function blue(v){ // interpolate blue-050 -> blue-700
+    const a=[238,244,251], b=[13,54,107];
+    const r=Math.round(a[0]+(b[0]-a[0])*v), g=Math.round(a[1]+(b[1]-a[1])*v), bl=Math.round(a[2]+(b[2]-a[2])*v);
+    return `rgb(${r},${g},${bl})`;
+  }
+  let html='<tr><th></th>'+C.map(c=>`<th class="col">${nice(c)}</th>`).join('')+'</tr>';
+  cm.forEach((row,i)=>{
+    html+=`<tr><th class="row">${nice(C[i])}</th>`;
+    row.forEach((v,j)=>{
+      const txt=v>=0.005?Math.round(v*100):'';
+      html+=`<td style="background:${blue(v)};color:${v>0.5?'#fff':'#0b0b0b'}"
+        title="True ${nice(C[i])} → predicted ${nice(C[j])}: ${cnt[i][j]} (${pct(v)})">${txt}</td>`;
+    });
+    html+='</tr>';
+  });
+  document.getElementById('cm').innerHTML=html;
+
+  // ── distribution ──
+  const dmax=Math.max(...R.distribution.map(d=>d.count));
+  const dtot=R.distribution.reduce((s,d)=>s+d.count,0);
+  document.getElementById('dist').innerHTML=R.distribution.map(d=>
+    `<div class="dist-row"><span class="lab">${nice(d.label)}</span>
+       <span class="track"><span class="fill" style="width:${d.count/dmax*100}%"></span></span>
+       <span class="val num">${d.count} · ${pct(d.count/dtot)}</span></div>`).join('');
+
+  // ── examples ──
+  document.getElementById('examples').innerHTML=R.examples.map(e=>{
+    const ci=C.indexOf(e.true);
+    const rows=e.top3.map((t,k)=>
+      `<div class="p3-row ${k===0?'top':''}"><span class="l">${nice(t.label)}</span>
+         <span class="t"><span class="f" style="width:${t.prob*100}%"></span></span>
+         <span class="pv num">${pct(t.prob)}</span></div>`).join('');
+    return `<div class="ex">
+      <div class="ex-top"><span class="chip"><span class="sw" style="background:${PAL[ci]}"></span>${nice(e.true)}</span>
+        <span class="meta num">${e.length} aa</span></div>
+      <div class="seq">${e.preview}…</div>
+      <div class="p3">${rows}</div></div>`;
+  }).join('');
+
+  // animate bars in after layout
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    document.querySelectorAll('.fill[data-w]').forEach(el=>el.style.width=el.dataset.w);
+  }));
+  resize();
+})();
+</script>
+</body>
+</html>

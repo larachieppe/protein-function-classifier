@@ -1,0 +1,36 @@
+model:
+  # ESM-2 sizes (accuracy vs. compute trade-off):
+  #   facebook/esm2_t6_8M_UR50D    -  8M  fast local smoke tests
+  #   facebook/esm2_t30_150M_UR50D - 150M sweet spot on a free Colab T4  (default)
+  #   facebook/esm2_t33_650M_UR50D - 650M best accuracy; needs grad checkpointing + small batch
+  name: facebook/esm2_t30_150M_UR50D
+  num_labels: 10
+  dropout: 0.1
+
+training:
+  output_dir: outputs/
+  num_epochs: 3                      # pLMs fine-tune fast; 3-4 epochs is plenty
+  batch_size: 8
+  gradient_accumulation_steps: 2     # effective batch size 16
+  gradient_checkpointing: false      # set true for the 650M model on a T4
+  learning_rate: 0.00002
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  class_weighted_loss: true          # counter the Nucleus(35%) vs Peroxisome(0.8%) imbalance
+  eval_strategy: epoch
+  save_strategy: epoch
+  load_best_model_at_end: true
+  metric_for_best_model: macro_f1    # honest metric for imbalanced multiclass
+  fp16: true                         # T4 supports it; set false on CPU/MPS
+
+data:
+  train_path: data/train.csv
+  val_path: data/val.csv
+  test_path: data/test.csv
+  sequence_col: sequence
+  label_col: label
+  max_length: 512                    # covers ~59% of sequences fully; 1024 covers ~89%
+
+logging:
+  wandb_project: null                # set to a project name to enable W&B tracking
+  wandb_entity: null

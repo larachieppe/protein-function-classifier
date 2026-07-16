@@ -1,0 +1,141 @@
+"""Build the static-site data file (docs/results.js) from real model outputs.
+
+Everything the website shows is computed here from measured predictions -- no
+hand-entered numbers. Currently sourced from the frozen-ESM-2 linear-probe
+baseline; re-run after fine-tuning to refresh the site with the better model.
+
+    python src/embeddings.py --model facebook/esm2_t12_35M_UR50D   # cache first
+    python src/build_site.py
+"""
+import argparse
+import json
+import os
+
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import (
+    accuracy_score, f1_score, matthews_corrcoef, confusion_matrix,
+    precision_recall_fscore_support,
+)
+
+from data import load_splits
+
+
+def load_emb(emb_dir, split, tag):
+    d = np.load(os.path.join(emb_dir, f"{split}_{tag}.npz"), allow_pickle=True)
+    return d["embeddings"], d["labels"]
+
+
+def umap_2d(X, seed=42):
+    import umap
+    return umap.UMAP(n_neighbors=25, min_dist=0.3, metric="cosine",
+                     random_state=seed).fit_transform(X).astype(float)
+
+
+def main(model_name, emb_dir, out_path):
+    tag = model_name.split("/")[-1]
+    Xtr, ytr = load_emb(emb_dir, "train", tag)
+    Xte, yte = load_emb(emb_dir, "test", tag)
+    _, _, test_df = load_splits("data/train.csv", "data/val.csv", "data/test.csv",
+                                "sequence", "label")
+    train_df = pd.read_csv("data/train.csv")
+
+    classes = sorted(np.unique(ytr).tolist())
+    cls_idx = {c: i for i, c in enumerate(classes)}
+
+    clf = make_pipeline(StandardScaler(),
+                        LogisticRegression(max_iter=2000, class_weight="balanced"))
+    clf.fit(Xtr, ytr)
+    proba = clf.predict_proba(Xte)                 # columns follow clf.classes_
+    col_order = [list(clf.classes_).index(c) for c in classes]
+    proba = proba[:, col_order]
+    pred = np.array([classes[i] for i in proba.argmax(1)])
+
+    # ── headline metrics ──────────────────────────────────────────────────────
+    metrics = {
+        "accuracy": float(accuracy_score(yte, pred)),
+        "macro_f1": float(f1_score(yte, pred, average="macro")),
+        "weighted_f1": float(f1_score(yte, pred, average="weighted")),
+        "mcc": float(matthews_corrcoef(yte, pred)),
+        "n_test": int(len(yte)),
+    }
+
+    # ── per-class table ───────────────────────────────────────────────────────
+    p, r, f, s = precision_recall_fscore_support(yte, pred, labels=classes, zero_division=0)
+    per_class = [
+        {"label": c, "precision": float(p[i]), "recall": float(r[i]),
+         "f1": float(f[i]), "support": int(s[i])}
+        for i, c in enumerate(classes)
+    ]
+
+    # ── confusion matrix (counts + row-normalized) ────────────────────────────
+    cm = confusion_matrix(yte, pred, labels=classes)
+    cm_norm = cm / cm.sum(1, keepdims=True).clip(min=1)
+
+    # ── class distribution (train) ────────────────────────────────────────────
+    tr_counts = train_df["label"].value_counts().to_dict()
+    distribution = [{"label": c, "count": int(tr_counts.get(c, 0))} for c in classes]
+
+    # ── UMAP scatter (test set) ───────────────────────────────────────────────
+    print("Computing UMAP projection ...")
+    xy = umap_2d(Xte)
+    conf = proba.max(1)
+    points = [
+        {"x": round(float(xy[i, 0]), 3), "y": round(float(xy[i, 1]), 3),
+         "t": cls_idx[yte[i]], "p": cls_idx[pred[i]], "c": round(float(conf[i]), 3)}
+        for i in range(len(yte))
+    ]
+
+    # ── example proteins: most-confident correct call per class ──────────────
+    seqs = test_df["sequence"].tolist()
+    examples = []
+    for c in classes:
+        mask = (yte == c) & (pred == c)
+        if not mask.any():
+            continue
+        idxs = np.where(mask)[0]
+        best = idxs[conf[idxs].argmax()]
+        order = proba[best].argsort()[::-1][:3]
+        examples.append({
+            "true": c,
+            "length": len(seqs[best]),
+            "preview": seqs[best][:60],
+            "top3": [{"label": classes[j], "prob": round(float(proba[best, j]), 3)} for j in order],
+        })
+
+    results = {
+        "model": model_name,
+        "source": "frozen ESM-2 embeddings + logistic regression (linear probe)",
+        "dataset": {"name": "DeepLoc (proteinea/deeploc)",
+                    "n_train": int(len(ytr)), "n_test": int(len(yte)),
+                    "n_classes": len(classes)},
+        "classes": classes,
+        "metrics": metrics,
+        "per_class": per_class,
+        "confusion": {"counts": cm.astype(int).tolist(),
+                      "normalized": np.round(cm_norm, 3).tolist()},
+        "distribution": distribution,
+        "points": points,
+        "examples": examples,
+    }
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
+        f.write("// Auto-generated by src/build_site.py — do not edit by hand.\n")
+        f.write("window.RESULTS = ")
+        json.dump(results, f, separators=(",", ":"))
+        f.write(";\n")
+    kb = os.path.getsize(out_path) / 1024
+    print(f"Wrote {out_path} ({kb:.0f} KB) — {len(points)} points, {len(examples)} examples")
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser()
+    p.add_argument("--model", default="facebook/esm2_t12_35M_UR50D")
+    p.add_argument("--emb-dir", default="outputs/embeddings")
+    p.add_argument("--out-path", default="docs/results.js")
+    args = p.parse_args()
+    main(args.model, args.emb_dir, args.out_path)
