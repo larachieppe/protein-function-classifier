@@ -8,21 +8,21 @@ Knowing a protein's subcellular location is a real biological problem: it constr
 protein's function, flags drug targets, and helps annotate the ~200M sequences in UniProt
 that have never been studied in a lab.
 
-### 🌐 [**→ Explore the interactive results dashboard**](https://claude.ai/code/artifact/d1e98f99-4bc4-47fc-af18-ee5eb840ac57)
+### 🌐 [**→ Explore the interactive results dashboard**](https://larachieppe.github.io/protein-function-classifier/)
 
 A live, interactive page — embedding explorer, per-class F1, confusion matrix, and example
 predictions — all built from real test-set outputs. *(Click the figure below to open it.)*
 
-[![ESM-2 embeddings clustered by subcellular location](outputs/embedding_umap.png)](https://claude.ai/code/artifact/d1e98f99-4bc4-47fc-af18-ee5eb840ac57)
+[![ESM-2 embeddings clustered by subcellular location](outputs/embedding_umap.png)](https://larachieppe.github.io/protein-function-classifier/)
 
 *Every point is a test-set protein, positioned by a 2-D UMAP of its **frozen** ESM-2
 embedding and colored by its true compartment. The language model was never told what
 "a mitochondrion" is, yet mitochondrial (pink), plastid (cyan), and extracellular (red)
 proteins already separate — the transfer-learning signal that makes fine-tuning work.*
 
-> The same dashboard also ships as a static site in [`docs/`](docs/index.html) — run it locally
-> with `python -m http.server -d docs 8080`, or deploy free via **GitHub Pages**
-> (*Settings → Pages → Deploy from branch → `main` / `docs`*).
+> The dashboard is the static site in [`docs/`](docs/index.html), served via GitHub Pages. Run it
+> locally with `python -m http.server -d docs 8080`, and after fine-tuning re-run
+> `python src/build_site.py` to refresh every chart.
 
 ## Results
 
