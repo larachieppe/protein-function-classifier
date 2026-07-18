@@ -25,8 +25,10 @@ class EsmAttentionClassifier(nn.Module):
     """
 
     def __init__(self, model_name, num_labels, label2id=None, id2label=None,
-                 dropout=0.1, class_weights=None):
+                 dropout=0.1, class_weights=None, loss_type="ce", focal_gamma=2.0):
         super().__init__()
+        self.loss_type = loss_type
+        self.focal_gamma = focal_gamma
         self.esm = AutoModel.from_pretrained(model_name)
         h = self.esm.config.hidden_size
         self.attn = nn.Linear(h, 1)
@@ -63,12 +65,42 @@ class EsmAttentionClassifier(nn.Module):
         loss = None
         if labels is not None:
             w = self.class_weights.to(logits.device) if self.class_weights is not None else None
-            loss = nn.functional.cross_entropy(logits, labels, weight=w)
+            if self.loss_type == "focal":
+                # focal loss: down-weight easy examples so rare classes aren't ignored
+                logp = nn.functional.log_softmax(logits, dim=-1)
+                ce = nn.functional.nll_loss(logp, labels, weight=w, reduction="none")
+                pt = logp.gather(1, labels.unsqueeze(1)).squeeze(1).exp()
+                loss = ((1 - pt) ** self.focal_gamma * ce).mean()
+            else:
+                loss = nn.functional.cross_entropy(logits, labels, weight=w)
         return {"loss": loss, "logits": logits}
 
 
 def build_attention_model(model_name, num_labels, label2id, id2label,
-                          dropout=0.1, class_weights=None):
+                          dropout=0.1, class_weights=None, loss_type="ce", focal_gamma=2.0):
     return EsmAttentionClassifier(
         model_name, num_labels, label2id, id2label, dropout, class_weights,
+        loss_type=loss_type, focal_gamma=focal_gamma,
     )
+
+
+def llrd_param_groups(model, base_lr, weight_decay=0.01, decay=0.9):
+    """Layer-wise LR decay: deeper ESM layers train faster, lower layers slower.
+    The classification head gets the full base_lr; each encoder layer below it is
+    scaled by `decay` per layer. A standard win when fine-tuning large LMs."""
+    try:
+        layers = model.esm.encoder.layer
+    except AttributeError:
+        return [{"params": [p for p in model.parameters() if p.requires_grad],
+                 "lr": base_lr, "weight_decay": weight_decay}]
+    n = len(layers)
+    groups = []
+    # head + pooling + embeddings, keyed by depth
+    head = [p for name, p in model.named_parameters()
+            if p.requires_grad and not name.startswith("esm.encoder.layer")]
+    groups.append({"params": head, "lr": base_lr, "weight_decay": weight_decay})
+    for i, layer in enumerate(layers):
+        lr_i = base_lr * (decay ** (n - 1 - i))
+        groups.append({"params": [p for p in layer.parameters() if p.requires_grad],
+                       "lr": lr_i, "weight_decay": weight_decay})
+    return groups

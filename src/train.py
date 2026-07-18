@@ -16,7 +16,7 @@ from sklearn.metrics import (
 from transformers import TrainingArguments, Trainer, DataCollatorWithPadding
 
 from data import load_splits, build_label_maps, tokenize_dataset, get_tokenizer
-from model import build_model, build_attention_model
+from model import build_model, build_attention_model, llrd_param_groups
 
 
 def compute_metrics(eval_pred):
@@ -62,11 +62,20 @@ def main(config_path="configs/config.yaml"):
 
     if mcfg.get("head", "attention") == "attention":
         model = build_attention_model(mcfg["name"], num_labels, label2id, id2label,
-                                      dropout=mcfg.get("dropout", 0.1), class_weights=class_weights)
+                                      dropout=mcfg.get("dropout", 0.1), class_weights=class_weights,
+                                      loss_type=tcfg.get("loss", "ce"),
+                                      focal_gamma=tcfg.get("focal_gamma", 2.0))
     else:
         model = build_model(mcfg["name"], num_labels, label2id, id2label)
     if tcfg.get("gradient_checkpointing"):
         model.gradient_checkpointing_enable()
+
+    # optional layer-wise LR decay optimizer
+    optimizers = (None, None)
+    if tcfg.get("llrd"):
+        groups = llrd_param_groups(model, tcfg["learning_rate"],
+                                   tcfg.get("weight_decay", 0.01), tcfg.get("llrd_decay", 0.9))
+        optimizers = (torch.optim.AdamW(groups), None)
 
     args = TrainingArguments(
         output_dir=tcfg["output_dir"],
@@ -97,6 +106,7 @@ def main(config_path="configs/config.yaml"):
         eval_dataset=val_ds,
         compute_metrics=compute_metrics,
         data_collator=DataCollatorWithPadding(tokenizer),
+        optimizers=optimizers,
     )
 
     trainer.train()

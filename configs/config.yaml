@@ -17,6 +17,10 @@ training:
   lr_scheduler_type: cosine
   warmup_ratio: 0.1
   weight_decay: 0.01
+  loss: focal                        # 'focal' revives rare classes without hurting accuracy; or 'ce'
+  focal_gamma: 2.0
+  llrd: true                         # layer-wise LR decay (deeper layers train faster)
+  llrd_decay: 0.9
   class_weighted_loss: false         # OFF: optimize for accuracy (weighting trades acc for macro-F1)
   eval_strategy: epoch
   save_strategy: epoch
