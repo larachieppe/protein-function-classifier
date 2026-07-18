@@ -56,15 +56,17 @@ where sequence-based membrane prediction sits in the literature.
 
 ## Dataset
 
-[`proteinea/deeploc`](https://huggingface.co/datasets/proteinea/deeploc) — the **DeepLoc**
-benchmark (Almagro Armenteros et al., 2017): SwissProt proteins with experimentally-supported
-subcellular localization. `src/prepare_data.py` downloads it and carves a **stratified**
-validation split out of the training data so model selection never sees the test set.
+Two interchangeable 10-class DeepLoc sources (`src/prepare_data.py --source ...`):
 
-- **5,959** train / **663** val / **1,842** test
-- **10** compartments, heavily imbalanced: Nucleus 35% → Peroxisome 0.8%
-  (handled with an inverse-frequency **class-weighted loss** and reported via **macro-F1**,
-  not just accuracy)
+| Source | Train | Test | Notes |
+|---|---|---|---|
+| `deeploc` — [`proteinea/deeploc`](https://huggingface.co/datasets/proteinea/deeploc) | 5,959 | 1,842 | canonical 2017 split |
+| `deeploc-multi` — [`AI4Protein/DeepLocMulti`](https://huggingface.co/datasets/AI4Protein/DeepLocMulti) | 9,324 | 2,742 | **larger** split, ~2× the rare classes |
+
+More training data is the biggest accuracy lever, so the training notebook uses **DeepLocMulti**.
+Both are the same 10 compartments and heavily imbalanced (Nucleus ~30% → Peroxisome ~1%); their
+test sets differ, so a DeepLocMulti number is comparable to papers using that split, not to the
+2017 number.
 
 ## Quickstart (local)
 
