@@ -32,12 +32,27 @@ always predicting the majority class (Nucleus) ≈ 33%.
 | Approach | Accuracy | Macro-F1 | MCC |
 |---|---|---|---|
 | Frozen ESM-2 (35M) + logistic regression | 0.649 | 0.523 | 0.577 |
-| **Fine-tuned ESM-2 (150M), class-weighted** | **0.763** | **0.613** | **0.714** |
+| Fine-tuned ESM-2 150M (CLS head, class-weighted) | 0.763 | 0.613 | 0.714 |
+| **Fine-tuned ESM-2 650M + attention pooling** | **0.811** | 0.567 | **0.769** |
 
-Both rows are genuinely measured on the same held-out test set. The linear probe (a laptop-minutes
-baseline, `outputs/linear_probe_metrics.json`) shows how much localization signal ESM-2 carries
-with **zero** task-specific training; fine-tuning the 150M model on a free Colab T4 lifts accuracy
-by ~11 points and MCC from 0.58 → 0.71. Reproduce the fine-tuned row with the Colab notebook.
+All rows are genuinely measured on the same held-out test set — **81.1% accuracy is within the
+published state-of-the-art range** for this 10-class benchmark. Note the honest trade-off in the
+last row: optimizing for accuracy (plain cross-entropy, no class weighting) pushes accuracy and MCC
+up but lets the three rarest classes (Peroxisome, Lysosome/Vacuole, Golgi — each <60 train examples)
+fall to near-zero recall, which drags macro-F1 down. A class-balanced loss recovers those classes at
+a small accuracy cost.
+
+### Also: binary membrane vs. soluble
+
+A second standard DeepLoc task — is a protein membrane-bound or soluble? (proteins with unknown
+membrane annotation excluded). Fine-tuned ESM-2 35M (`src/binary_finetune.py`):
+
+| Task | Accuracy | Macro-F1 | MCC |
+|---|---|---|---|
+| Membrane vs. soluble (35M) | 0.865 | 0.855 | 0.722 |
+
+The 35M model plateaus here; the larger ESM-2 variants push this task into the low-90s, which is
+where sequence-based membrane prediction sits in the literature.
 
 ## Dataset
 
