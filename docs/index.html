@@ -49,6 +49,9 @@
   .sidebar a{display:block; padding:4px 22px; color:var(--ink-2); border-left:2px solid transparent}
   .sidebar a:hover{color:var(--ink); text-decoration:none}
   .sidebar a.on{color:var(--ink); border-left-color:var(--accent)}
+  .sidebar a.ext{padding-top:5px; padding-bottom:5px}
+  .sidebar a.ext .ar{color:var(--muted); font-size:10px}
+  .sidebar a.ext .d{display:block; color:var(--muted); font-size:10.5px; margin-top:1px}
 
   /* ── page head ── */
   .eyebrow{font-family:var(--mono); font-size:12px; color:var(--muted); margin-bottom:14px}
@@ -112,13 +115,31 @@
   .bar-row .val{color:var(--ink); text-align:right}
   @media(prefers-reduced-motion:reduce){.fill{transition:none}}
 
+  /* ── task comparison ── */
+  .cmp-scroll{overflow-x:auto}
+  table.cmp{border-collapse:collapse; width:100%; min-width:640px; font-family:var(--mono); font-size:12.5px}
+  table.cmp th{text-align:right; font-weight:400; color:var(--accent); font-size:11.5px;
+    padding:0 0 10px; border-bottom:1px solid var(--line)}
+  table.cmp th:first-child{text-align:left}
+  table.cmp td{padding:13px 0; border-bottom:1px solid var(--line-soft); text-align:right; color:var(--ink-2)}
+  table.cmp td:first-child{text-align:left}
+  table.cmp tr.cur td{color:var(--ink)}
+  table.cmp tr.cur td:first-child{box-shadow:inset 2px 0 0 var(--accent); padding-left:11px}
+  table.cmp .t{color:var(--ink)}
+  table.cmp .note{display:block; color:var(--muted); font-size:11px; margin-top:3px}
+  table.cmp .best{color:var(--accent)}
+
   /* ── confusion ── */
   .cm-scroll{overflow-x:auto}
-  table.cm{border-collapse:separate; border-spacing:2px; font-family:var(--mono)}
+  table.cm{border-collapse:separate; border-spacing:3px; font-family:var(--mono); table-layout:fixed}
   table.cm th{font-weight:400; font-size:11px; color:var(--muted)}
-  table.cm th.col{writing-mode:vertical-rl; transform:rotate(180deg); vertical-align:bottom; height:130px; padding:0 2px}
-  table.cm th.row{text-align:right; padding-right:10px; white-space:nowrap}
-  table.cm td{width:46px; height:40px; text-align:center; border-radius:3px; font-size:11px}
+  table.cm th.row{width:176px; text-align:right; padding-right:12px; line-height:1.3; overflow-wrap:anywhere}
+  table.cm th.col{width:64px; text-align:center; vertical-align:bottom; padding-bottom:9px; line-height:1.3;
+    overflow-wrap:anywhere}
+  /* rotate column labels only when there are too many to fit horizontally */
+  table.cm th.col.rot{writing-mode:vertical-rl; transform:rotate(180deg); height:160px;
+    padding:0 2px 0 0; white-space:nowrap; text-align:left}
+  table.cm td{width:64px; height:56px; text-align:center; border-radius:3px; font-size:12.5px}
   .cm-axis{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:10px}
 
   /* ── distribution ── */
@@ -163,6 +184,7 @@
     <div class="nav-group">
       <div class="nav-head">Results</div>
       <a href="#overview">overview</a>
+      <a href="#comparison">task comparison</a>
       <a href="#binary">membrane / soluble</a>
     </div>
     <div class="nav-group">
@@ -175,9 +197,12 @@
     </div>
     <div class="nav-group">
       <div class="nav-head">Source</div>
-      <a href="https://github.com/larachieppe/protein-function-classifier">github</a>
-      <a href="https://huggingface.co/datasets/AI4Protein/DeepLocMulti">dataset</a>
-      <a href="https://huggingface.co/facebook/esm2_t30_150M_UR50D">esm-2</a>
+      <a class="ext" href="https://github.com/larachieppe/protein-function-classifier" target="_blank" rel="noopener">
+        code <span class="ar">↗</span><span class="d">github repo</span></a>
+      <a class="ext" href="https://huggingface.co/datasets/AI4Protein/DeepLocMulti" target="_blank" rel="noopener">
+        data <span class="ar">↗</span><span class="d">DeepLocMulti</span></a>
+      <a class="ext" href="https://huggingface.co/facebook/esm2_t30_150M_UR50D" target="_blank" rel="noopener">
+        model <span class="ar">↗</span><span class="d">ESM-2 150M</span></a>
     </div>
   </aside>
 
@@ -193,6 +218,16 @@
     </header>
 
     <div class="rule"></div>
+
+    <section id="comparison" hidden>
+      <h2>Task comparison</h2>
+      <p class="sub">The same localization problem at three granularities. Coarser tasks score
+        higher because they are <em>easier</em> — not because the model is better. Shown together so
+        the trade-off is visible.</p>
+      <div class="cmp-scroll"><table class="cmp" id="cmp"></table></div>
+      <p class="caption" id="cmp-note" style="margin-top:16px"></p>
+      <div class="rule"></div>
+    </section>
 
     <section id="binary" hidden>
       <h2>Membrane vs. soluble</h2>
@@ -287,6 +322,25 @@
   document.getElementById('stats').innerHTML = stats.map(([k,v,s])=>
     `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div><div class="sub">${s}</div></div>`).join('');
 
+  // ── task comparison ──
+  if(R.comparison && R.comparison.length){
+    const rows=[...R.comparison].sort((a,b)=>a.classes-b.classes);
+    const best=k=>Math.max(...rows.map(r=>r[k]));
+    const cell=(r,k,d=3)=> `<td class="${r[k]===best(k)?'best':''}">${r[k].toFixed(d)}</td>`;
+    document.getElementById('cmp').innerHTML =
+      `<tr><th>task</th><th>classes</th><th>accuracy</th><th>macro-f1</th><th>mcc</th><th>test n</th><th>model</th></tr>`+
+      rows.map(r=>`<tr class="${r.current?'cur':''}">
+        <td><span class="t">${r.task}</span>${r.current?' <span style="color:var(--accent)">←</span>':''}
+          <span class="note">${r.note}</span></td>
+        <td>${r.classes}</td>${cell(r,'accuracy')}${cell(r,'macro_f1')}${cell(r,'mcc')}
+        <td>${r.n_test.toLocaleString()}</td><td style="color:var(--muted)">${r.model}</td></tr>`).join('');
+    document.getElementById('cmp-note').innerHTML =
+      `Highlighted row is what the charts below show. <b style="color:var(--ink-2)">Blue</b> marks the best value per column. `+
+      `Note the 10-class row: its macro-F1 collapses because the three rarest compartments get almost no recall — `+
+      `grouping them is exactly what makes the 4-class task both higher-scoring and better behaved.`;
+    document.getElementById('comparison').hidden=false;
+  }
+
   // ── binary ──
   if(R.binary){
     const b=R.binary;
@@ -364,7 +418,8 @@
   const cm=R.confusion.normalized, cnt=R.confusion.counts;
   function ramp(v){ const a=[31,39,51], b=[74,158,255];
     return `rgb(${Math.round(a[0]+(b[0]-a[0])*v)},${Math.round(a[1]+(b[1]-a[1])*v)},${Math.round(a[2]+(b[2]-a[2])*v)})`; }
-  let html='<tr><th></th>'+C.map(c=>`<th class="col">${nice(c)}</th>`).join('')+'</tr>';
+  const rot = C.length > 6 ? ' rot' : '';   // horizontal labels read better at few classes
+  let html='<tr><th></th>'+C.map(c=>`<th class="col${rot}">${nice(c)}</th>`).join('')+'</tr>';
   cm.forEach((row,i)=>{ html+=`<tr><th class="row">${nice(C[i])}</th>`;
     row.forEach((v,j)=>{ html+=`<td style="background:${ramp(v)};color:${v>0.45?'#fff':'#8a8a8a'}"
       title="true ${nice(C[i])} → predicted ${nice(C[j])}: ${cnt[i][j]} (${pct(v)})">${v>=0.005?Math.round(v*100):''}</td>`; });
@@ -398,7 +453,7 @@
     es.forEach(en=>{ if(en.isIntersecting){ links.forEach(a=>a.classList.remove('on'));
       (byId[en.target.id]||{}).classList?.add('on'); } });
   },{rootMargin:'-10% 0px -75% 0px'});
-  ['overview','binary','embedding','perclass','confusion','distribution','examples']
+  ['overview','comparison','binary','embedding','perclass','confusion','distribution','examples']
     .forEach(id=>{ const el=document.getElementById(id); if(el) obs.observe(el); });
 
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
