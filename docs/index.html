@@ -146,16 +146,22 @@
 
   /* ── task comparison ── */
   .cmp-scroll{overflow-x:auto}
-  table.cmp{border-collapse:collapse; width:100%; min-width:640px; font-family:var(--mono); font-size:12.5px}
-  table.cmp th{text-align:right; font-weight:400; color:var(--accent); font-size:11.5px;
-    padding:0 0 10px 20px; border-bottom:1px solid var(--line)}
-  table.cmp th:first-child{text-align:left; padding-left:0}
-  table.cmp td{padding:13px 0 13px 20px; border-bottom:1px solid var(--line-soft); text-align:right; color:var(--ink-2); white-space:nowrap}
-  table.cmp td:first-child{text-align:left; padding-left:0}
+  table.cmp{border-collapse:collapse; width:100%; min-width:830px;
+    font-family:var(--mono); font-size:12.5px}
+  /* every cell gets real horizontal padding, otherwise the numeric columns collide */
+  table.cmp th, table.cmp td{padding:13px 14px; text-align:right; white-space:nowrap;
+    font-variant-numeric:tabular-nums}
+  table.cmp th{font-weight:400; color:var(--accent); font-size:11.5px;
+    padding-top:0; padding-bottom:11px; border-bottom:1px solid var(--line)}
+  table.cmp td{border-bottom:1px solid var(--line-soft); color:var(--ink-2)}
+  /* task column: left aligned, wraps, and keeps room for the accent bar */
+  table.cmp th:first-child, table.cmp td:first-child{text-align:left; white-space:normal; padding-left:13px}
+  /* model column: wraps rather than stretching the table */
+  table.cmp th:last-child, table.cmp td:last-child{white-space:normal; padding-right:0}
   table.cmp tr.cur td{color:var(--ink)}
-  table.cmp tr.cur td:first-child{box-shadow:inset 2px 0 0 var(--accent); padding-left:11px}
+  table.cmp tr.cur td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
   table.cmp .t{color:var(--ink)}
-  table.cmp .note{display:block; color:var(--muted); font-size:11px; margin-top:3px}
+  table.cmp .note{display:block; color:var(--muted); font-size:11px; margin-top:4px; white-space:normal}
   table.cmp .best{color:var(--accent)}
 
   /* ── confusion ── */
@@ -385,6 +391,8 @@
     const best=k=>Math.max(...rows.map(r=>r[k]));
     const cell=(r,k)=>`<td class="${r[k]===best(k)?'best':''}">${r[k].toFixed(3)}</td>`;
     document.getElementById('cmp').innerHTML =
+      `<colgroup><col><col style="width:78px"><col style="width:96px"><col style="width:96px">`+
+      `<col style="width:86px"><col style="width:88px"><col style="width:220px"></colgroup>`+
       `<tr><th>task</th><th>classes</th><th>accuracy</th><th>macro-f1</th><th>mcc</th><th>test n</th><th>model</th></tr>`+
       rows.map(r=>{const cur=String(r.classes)===active;
         return `<tr class="${cur?'cur':''}"><td><span class="t">${r.task}</span>${cur?' <span style="color:var(--accent)">←</span>':''}
