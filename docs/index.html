@@ -131,6 +131,14 @@
   .bar-row .val{color:var(--ink); text-align:right}
   @media(prefers-reduced-motion:reduce){.fill{transition:none}}
 
+  /* ── analysis view switcher ── */
+  .viewbar{position:sticky; top:0; z-index:10; display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+    background:var(--bg); border-bottom:1px solid var(--line); padding:13px 0; margin-top:64px;
+    font-family:var(--mono); font-size:12px}
+  .vb-label{color:var(--muted)}
+  .vb-meta{color:var(--muted); margin-left:auto}
+  @media(max-width:640px){.vb-meta{margin-left:0; width:100%}}
+
   /* ── task comparison ── */
   .cmp-scroll{overflow-x:auto}
   table.cmp{border-collapse:collapse; width:100%; min-width:640px; font-family:var(--mono); font-size:12.5px}
@@ -254,6 +262,12 @@
       <div class="rule"></div>
     </section>
 
+    <div class="viewbar" id="viewbar" hidden>
+      <span class="vb-label">analysis for</span>
+      <div class="seg" id="view-seg"></div>
+      <span class="vb-meta" id="view-meta"></span>
+    </div>
+
     <section id="embedding">
       <h2>Embedding map</h2>
       <p class="sub">Each protein placed by a 2-D UMAP of its ESM-2 embedding. Click a class to
@@ -323,61 +337,77 @@
   const nice = s => s.replace(/\./g,' ');
   const pct = x => (x*100).toFixed(1)+'%';
 
-  // ── head ──
-  note.textContent = `${R.dataset.n_classes} classes · ${R.metrics.n_test.toLocaleString()} held-out proteins · ${R.dataset.name}`;
-  document.getElementById('badge-classes').textContent = R.dataset.n_classes + '-class';
-  document.getElementById('foot-model').textContent = R.model;
-  document.getElementById('method-note').innerHTML =
-    `Method: <b style="color:var(--ink-2)">${R.source}</b>. Random guessing ≈ ${pct(1/R.dataset.n_classes)}. `+
-    `Every number here is computed from real held-out predictions.`;
-  const stats = [
-    ['accuracy', pct(R.metrics.accuracy), 'vs '+pct(1/R.dataset.n_classes)+' chance'],
-    ['macro-f1', R.metrics.macro_f1.toFixed(3), 'all classes equal'],
-    ['mcc', R.metrics.mcc.toFixed(3), 'matthews corr.'],
-    ['proteins', R.metrics.n_test.toLocaleString(), 'held-out test'],
-  ];
-  document.getElementById('stats').innerHTML = stats.map(([k,v,s])=>
-    `<div class="tile"><div class="v">${v}</div><div class="k">${k}</div><div class="sub">${s}</div></div>`).join('');
+  let active = R.default_view;
+  const D = () => R.views[active];
 
-  // ── hero task cards: all three tasks, up front ──
-  if(R.comparison && R.comparison.length){
-    const LINK={2:'#binary',4:'#embedding',10:'#comparison'};
-    const GO={2:'see full breakdown ↓',4:'charts below detail this task ↓',10:'see metrics ↓'};
-    document.getElementById('tasks').innerHTML =
-      [...R.comparison].sort((a,b)=>a.classes-b.classes).map(r=>
-        `<a class="task-card ${r.current?'cur':''}" href="${LINK[r.classes]||'#comparison'}">
-           <div class="top"><span class="cls">${r.classes}-class</span>
-             ${r.current?'<span class="tag">shown below</span>':''}</div>
-           <div class="acc">${pct(r.accuracy)}</div>
-           <div class="nm">${r.task}</div>
-           <div class="sub">macro-f1 ${r.macro_f1.toFixed(3)} · mcc ${r.mcc.toFixed(3)} · n=${r.n_test.toLocaleString()}</div>
-           <span class="go">${GO[r.classes]||''}</span>
-         </a>`).join('');
+  /* ── hero task cards (clicking 4/10 switches the analysis) ── */
+  function renderCards(){
+    const el=document.getElementById('tasks');
+    el.innerHTML=[...R.comparison].sort((a,b)=>a.classes-b.classes).map(r=>{
+      const key=String(r.classes), isView=key in R.views, cur=isView&&key===active;
+      const go = isView ? (cur?'shown in the charts below ↓':'click to analyze this task ↓')
+                        : 'see full breakdown ↓';
+      return `<a class="task-card ${cur?'cur':''}" href="${isView?'#embedding':'#binary'}" data-view="${isView?key:''}">
+        <div class="top"><span class="cls">${r.classes}-class</span>${cur?'<span class="tag">shown below</span>':''}</div>
+        <div class="acc">${pct(r.accuracy)}</div>
+        <div class="nm">${r.task}</div>
+        <div class="sub">macro-f1 ${r.macro_f1.toFixed(3)} · mcc ${r.mcc.toFixed(3)} · n=${r.n_test.toLocaleString()}</div>
+        <span class="go">${go}</span></a>`;
+    }).join('');
+    el.querySelectorAll('.task-card').forEach(a=>{
+      const v=a.dataset.view; if(!v) return;
+      a.addEventListener('click',()=>{ if(v!==active){ active=v; renderAll(); } });
+    });
   }
 
-  // ── task comparison ──
-  if(R.comparison && R.comparison.length){
+  /* ── sticky switcher ── */
+  function renderSwitcher(){
+    const seg=document.getElementById('view-seg');
+    const keys=Object.keys(R.views).sort((a,b)=>+a-+b);
+    seg.innerHTML=keys.map(k=>`<button data-v="${k}" class="${k===active?'on':''}">${k}-class</button>`).join('');
+    seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+      if(b.dataset.v!==active){ active=b.dataset.v; renderAll(); } }));
+    const d=D();
+    document.getElementById('view-meta').textContent =
+      `${pct(d.metrics.accuracy)} accuracy · macro-f1 ${d.metrics.macro_f1.toFixed(3)} · mcc ${d.metrics.mcc.toFixed(3)} · n=${d.metrics.n_test.toLocaleString()}`;
+    document.getElementById('viewbar').hidden=false;
+  }
+
+  function renderHead(){
+    const d=D();
+    note.textContent = `${d.dataset.n_classes} classes · ${d.metrics.n_test.toLocaleString()} held-out proteins · ${d.dataset.name}`;
+    document.getElementById('badge-classes').textContent = active+'-class';
+    document.getElementById('foot-model').textContent = d.model;
+    document.getElementById('method-note').innerHTML =
+      `Method: <b style="color:var(--ink-2)">${d.source}</b>. Random guessing ≈ ${pct(1/d.dataset.n_classes)}. `+
+      `Every number here is computed from real held-out predictions.`;
+  }
+
+  /* ── task comparison table ── */
+  function renderComparison(){
+    if(!(R.comparison&&R.comparison.length)) return;
     const rows=[...R.comparison].sort((a,b)=>a.classes-b.classes);
     const best=k=>Math.max(...rows.map(r=>r[k]));
-    const cell=(r,k,d=3)=> `<td class="${r[k]===best(k)?'best':''}">${r[k].toFixed(d)}</td>`;
+    const cell=(r,k)=>`<td class="${r[k]===best(k)?'best':''}">${r[k].toFixed(3)}</td>`;
     document.getElementById('cmp').innerHTML =
       `<tr><th>task</th><th>classes</th><th>accuracy</th><th>macro-f1</th><th>mcc</th><th>test n</th><th>model</th></tr>`+
-      rows.map(r=>`<tr class="${r.current?'cur':''}">
-        <td><span class="t">${r.task}</span>${r.current?' <span style="color:var(--accent)">←</span>':''}
-          <span class="note">${r.note}</span></td>
-        <td>${r.classes}</td>${cell(r,'accuracy')}${cell(r,'macro_f1')}${cell(r,'mcc')}
-        <td>${r.n_test.toLocaleString()}</td><td style="color:var(--muted)">${r.model}</td></tr>`).join('');
+      rows.map(r=>{const cur=String(r.classes)===active;
+        return `<tr class="${cur?'cur':''}"><td><span class="t">${r.task}</span>${cur?' <span style="color:var(--accent)">←</span>':''}
+          <span class="note">${r.note}</span></td><td>${r.classes}</td>${cell(r,'accuracy')}${cell(r,'macro_f1')}${cell(r,'mcc')}
+          <td>${r.n_test.toLocaleString()}</td><td style="color:var(--muted)">${r.model}</td></tr>`;}).join('');
     document.getElementById('cmp-note').innerHTML =
-      `Highlighted row is what the charts below show. <b style="color:var(--ink-2)">Blue</b> marks the best value per column. `+
-      `Note the 10-class row: its macro-F1 collapses because the three rarest compartments get almost no recall — `+
-      `grouping them is exactly what makes the 4-class task both higher-scoring and better behaved.`;
+      `Highlighted row is the task the charts below show — switch it with the control above the charts. `+
+      `<b style="color:var(--ink-2)">Blue</b> marks the best value per column. Note the 10-class row: its macro-F1 `+
+      `collapses because the three rarest compartments get almost no recall — grouping them is exactly what makes `+
+      `the 4-class task both higher-scoring and better behaved.`;
     document.getElementById('comparison').hidden=false;
   }
 
-  // ── binary ──
-  if(R.binary){
+  /* ── binary summary (its own task, always shown) ── */
+  function renderBinary(){
+    if(!R.binary) return;
     const b=R.binary;
-    const bars = b.per_class.map(d=>
+    const bars=b.per_class.map(d=>
       `<div class="bar-row" title="precision ${d.precision.toFixed(2)} · recall ${d.recall.toFixed(2)} · support ${d.support}">`+
       `<span class="lab">${nice(d.label)}</span><span class="track"><span class="fill" data-w="${(d.f1*100).toFixed(1)}%"></span></span>`+
       `<span class="val">${d.f1.toFixed(2)}</span></div>`).join('');
@@ -386,112 +416,126 @@
          <div><div class="big">${pct(b.accuracy)}</div><div class="lab">accuracy · ${b.n_test.toLocaleString()} proteins</div></div>
          <div><div class="m">${b.mcc.toFixed(3)}</div><div class="lab">mcc</div></div>
          <div><div class="m">${b.macro_f1.toFixed(3)}</div><div class="lab">macro-f1</div></div>
-       </div>
-       <div class="bars" style="max-width:620px">${bars}</div>
+       </div><div class="bars" style="max-width:620px">${bars}</div>
        <p class="caption" style="margin-top:18px">Method: ${b.source}.</p>`;
     document.getElementById('binary').hidden=false;
   }
 
-  // ── scatter ──
-  const cv=document.getElementById('scatter'), ctx=cv.getContext('2d'), tip=document.getElementById('tip');
-  const box=document.getElementById('scatter-box'), P=R.points, C=R.classes;
-  let mode='true'; const active=new Set(); let W=0,H=0,dpr=1; const pad=20;
-  const xs=P.map(p=>p.x), ys=P.map(p=>p.y);
-  const xmin=Math.min(...xs),xmax=Math.max(...xs),ymin=Math.min(...ys),ymax=Math.max(...ys);
+  /* ── scatter (re-initialised per view) ── */
+  const cv=document.getElementById('scatter'), ctx=cv.getContext('2d'),
+        tip=document.getElementById('tip'), box=document.getElementById('scatter-box');
+  let P=[],C=[],mode='true',active_cls=new Set(),W=0,H=0,dpr=1,xmin,xmax,ymin,ymax;
+  const pad=20;
   const sx=v=>pad+(v-xmin)/(xmax-xmin)*(W-2*pad), sy=v=>H-pad-(v-ymin)/(ymax-ymin)*(H-2*pad);
+  const shown=p=> mode==='correct' ? true : (active_cls.size===0||active_cls.has(p.t));
+  const colorFor=p=> mode==='correct' ? (p.t===p.p?'#199e70':'#e66767') : PAL[p.t];
   function resize(){ dpr=Math.min(window.devicePixelRatio||1,2); W=box.clientWidth; H=box.clientHeight;
     cv.width=W*dpr; cv.height=H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); draw(); }
-  const shown=p=> mode==='correct' ? true : (active.size===0||active.has(p.t));
-  const colorFor=p=> mode==='correct' ? (p.t===p.p?'#199e70':'#e66767') : PAL[p.t];
   function draw(){
-    ctx.clearRect(0,0,W,H);
+    ctx.clearRect(0,0,W,H); if(!P.length) return;
     for(const p of P){ if(shown(p))continue; ctx.fillStyle=MUTED; ctx.globalAlpha=.55;
       ctx.beginPath(); ctx.arc(sx(p.x),sy(p.y),2,0,7); ctx.fill(); }
     for(const p of P){ if(!shown(p))continue; ctx.fillStyle=colorFor(p); ctx.globalAlpha=.75;
       ctx.beginPath(); ctx.arc(sx(p.x),sy(p.y),2.8,0,7); ctx.fill(); }
     ctx.globalAlpha=1;
   }
+  function renderScatter(){
+    const d=D(); P=d.points; C=d.classes; active_cls=new Set(); mode='true';
+    const xs=P.map(p=>p.x), ys=P.map(p=>p.y);
+    xmin=Math.min(...xs); xmax=Math.max(...xs); ymin=Math.min(...ys); ymax=Math.max(...ys);
+    document.querySelectorAll('#mode-seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode==='true'));
+    const counts=C.map(()=>0); P.forEach(p=>counts[p.t]++);
+    const legend=document.getElementById('legend');
+    legend.innerHTML=C.map((c,i)=>`<span class="lg" data-i="${i}"><span class="sw" style="background:${PAL[i]}"></span>${nice(c)} <span class="n">${counts[i]}</span></span>`).join('');
+    legend.querySelectorAll('.lg').forEach(el=>el.addEventListener('click',()=>{
+      if(mode!=='true')return; const i=+el.dataset.i;
+      active_cls.has(i)?active_cls.delete(i):active_cls.add(i); syncLegend(); draw(); }));
+    syncLegend(); resize();
+  }
+  function syncLegend(){ document.querySelectorAll('#legend .lg').forEach(el=>{ const i=+el.dataset.i;
+    el.classList.toggle('off', active_cls.size>0 && !active_cls.has(i) && mode==='true');
+    el.style.pointerEvents = mode==='true'?'auto':'none'; el.style.opacity = mode==='true'?'':'.35'; }); }
   cv.addEventListener('mousemove',e=>{
     const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
     let best=-1,bd=1e9;
     for(let i=0;i<P.length;i++){ if(!shown(P[i]))continue;
-      const dx=sx(P[i].x)-mx, dy=sy(P[i].y)-my, d=dx*dx+dy*dy; if(d<bd){bd=d;best=i;} }
+      const dx=sx(P[i].x)-mx, dy=sy(P[i].y)-my, d2=dx*dx+dy*dy; if(d2<bd){bd=d2;best=i;} }
     if(best>=0&&bd<90){ const p=P[best], ok=p.t===p.p;
       tip.style.left=sx(p.x)+'px'; tip.style.top=sy(p.y)+'px'; tip.style.opacity=1;
       tip.innerHTML=`${nice(C[p.t])}<br><span style="color:#7d7d7d">predicted</span> ${nice(C[p.p])} `+
-        `<span style="color:${ok?'#199e70':'#e66767'}">${ok?'✓':'✗'}</span><br>`+
-        `<span style="color:#7d7d7d">conf</span> ${pct(p.c)}`;
+        `<span style="color:${ok?'#199e70':'#e66767'}">${ok?'✓':'✗'}</span><br><span style="color:#7d7d7d">conf</span> ${pct(p.c)}`;
     } else tip.style.opacity=0;
   });
   cv.addEventListener('mouseleave',()=>tip.style.opacity=0);
-
-  const counts=C.map(()=>0); P.forEach(p=>counts[p.t]++);
-  const legend=document.getElementById('legend');
-  legend.innerHTML=C.map((c,i)=>`<span class="lg" data-i="${i}"><span class="sw" style="background:${PAL[i]}"></span>${nice(c)} <span class="n">${counts[i]}</span></span>`).join('');
-  function syncLegend(){ legend.querySelectorAll('.lg').forEach(el=>{ const i=+el.dataset.i;
-    el.classList.toggle('off', active.size>0 && !active.has(i) && mode==='true');
-    el.style.pointerEvents = mode==='true'?'auto':'none'; el.style.opacity = mode==='true'?'':'.35'; }); }
-  legend.querySelectorAll('.lg').forEach(el=>el.addEventListener('click',()=>{
-    if(mode!=='true')return; const i=+el.dataset.i;
-    active.has(i)?active.delete(i):active.add(i); syncLegend(); draw(); }));
   document.getElementById('mode-seg').addEventListener('click',e=>{
     const b=e.target.closest('button'); if(!b)return; mode=b.dataset.mode;
     document.querySelectorAll('#mode-seg button').forEach(x=>x.classList.toggle('on',x===b));
     syncLegend(); draw(); });
   window.addEventListener('resize',resize);
 
-  // ── per-class bars ──
-  document.getElementById('bars').innerHTML=[...R.per_class].sort((a,b)=>b.f1-a.f1).map(d=>
-    `<div class="bar-row" title="precision ${d.precision.toFixed(2)} · recall ${d.recall.toFixed(2)} · support ${d.support}">
-       <span class="lab">${nice(d.label)}</span>
-       <span class="track"><span class="fill" data-w="${(d.f1*100).toFixed(1)}%"></span></span>
-       <span class="val">${d.f1.toFixed(2)}</span></div>`).join('');
+  function renderBars(){
+    document.getElementById('bars').innerHTML=[...D().per_class].sort((a,b)=>b.f1-a.f1).map(d=>
+      `<div class="bar-row" title="precision ${d.precision.toFixed(2)} · recall ${d.recall.toFixed(2)} · support ${d.support}">
+         <span class="lab">${nice(d.label)}</span>
+         <span class="track"><span class="fill" data-w="${(d.f1*100).toFixed(1)}%"></span></span>
+         <span class="val">${d.f1.toFixed(2)}</span></div>`).join('');
+  }
 
-  // ── confusion ──
-  const cm=R.confusion.normalized, cnt=R.confusion.counts;
-  function ramp(v){ const a=[31,39,51], b=[74,158,255];
-    return `rgb(${Math.round(a[0]+(b[0]-a[0])*v)},${Math.round(a[1]+(b[1]-a[1])*v)},${Math.round(a[2]+(b[2]-a[2])*v)})`; }
-  const rot = C.length > 6 ? ' rot' : '';   // horizontal labels read better at few classes
-  let html='<tr><th></th>'+C.map(c=>`<th class="col${rot}">${nice(c)}</th>`).join('')+'</tr>';
-  cm.forEach((row,i)=>{ html+=`<tr><th class="row">${nice(C[i])}</th>`;
-    row.forEach((v,j)=>{ html+=`<td style="background:${ramp(v)};color:${v>0.45?'#fff':'#8a8a8a'}"
-      title="true ${nice(C[i])} → predicted ${nice(C[j])}: ${cnt[i][j]} (${pct(v)})">${v>=0.005?Math.round(v*100):''}</td>`; });
-    html+='</tr>'; });
-  document.getElementById('cm').innerHTML=html;
+  function renderCM(){
+    const d=D(), cm=d.confusion.normalized, cnt=d.confusion.counts, cls=d.classes;
+    const rot = cls.length>6 ? ' rot' : '';
+    function ramp(v){ const a=[31,39,51], b=[74,158,255];
+      return `rgb(${Math.round(a[0]+(b[0]-a[0])*v)},${Math.round(a[1]+(b[1]-a[1])*v)},${Math.round(a[2]+(b[2]-a[2])*v)})`; }
+    let html='<tr><th></th>'+cls.map(c=>`<th class="col${rot}">${nice(c)}</th>`).join('')+'</tr>';
+    cm.forEach((row,i)=>{ html+=`<tr><th class="row">${nice(cls[i])}</th>`;
+      row.forEach((v,j)=>{ html+=`<td style="background:${ramp(v)};color:${v>0.45?'#fff':'#8a8a8a'}"
+        title="true ${nice(cls[i])} → predicted ${nice(cls[j])}: ${cnt[i][j]} (${pct(v)})">${v>=0.005?Math.round(v*100):''}</td>`; });
+      html+='</tr>'; });
+    document.getElementById('cm').innerHTML=html;
+  }
 
-  // ── distribution ──
-  const dmax=Math.max(...R.distribution.map(d=>d.count));
-  const dtot=R.distribution.reduce((s,d)=>s+d.count,0);
-  document.getElementById('dist').innerHTML=R.distribution.map(d=>
-    `<div class="dist-row"><span class="lab">${nice(d.label)}</span>
-       <span class="track"><span class="fill" data-w="${d.count/dmax*100}%"></span></span>
-       <span class="val">${d.count} · ${pct(d.count/dtot)}</span></div>`).join('');
+  function renderDist(){
+    const dist=D().distribution;
+    const dmax=Math.max(...dist.map(d=>d.count)), dtot=dist.reduce((s,d)=>s+d.count,0);
+    document.getElementById('dist').innerHTML=dist.map(d=>
+      `<div class="dist-row"><span class="lab">${nice(d.label)}</span>
+         <span class="track"><span class="fill" data-w="${d.count/dmax*100}%"></span></span>
+         <span class="val">${d.count} · ${pct(d.count/dtot)}</span></div>`).join('');
+  }
 
-  // ── examples ──
-  document.getElementById('examples').innerHTML=R.examples.map(e=>{
-    const ci=C.indexOf(e.true);
-    const rows=e.top3.map((t,k)=>
-      `<div class="p3-row ${k===0?'top':''}"><span class="l">${nice(t.label)}</span>
-         <span class="t"><span class="f" style="width:${t.prob*100}%"></span></span>
-         <span class="pv">${pct(t.prob)}</span></div>`).join('');
-    return `<div class="ex"><div class="ex-top"><span class="sw" style="background:${PAL[ci]}"></span>
-      <span class="nm">${nice(e.true)}</span><span class="meta">${e.length} aa</span></div>
-      <div class="seq">${e.preview}…</div><div class="p3">${rows}</div></div>`;
-  }).join('');
+  function renderExamples(){
+    const d=D();
+    document.getElementById('examples').innerHTML=d.examples.map(e=>{
+      const ci=d.classes.indexOf(e.true);
+      const rows=e.top3.map((t,k)=>
+        `<div class="p3-row ${k===0?'top':''}"><span class="l">${nice(t.label)}</span>
+           <span class="t"><span class="f" style="width:${t.prob*100}%"></span></span>
+           <span class="pv">${pct(t.prob)}</span></div>`).join('');
+      return `<div class="ex"><div class="ex-top"><span class="sw" style="background:${PAL[ci]}"></span>
+        <span class="nm">${nice(e.true)}</span><span class="meta">${e.length} aa</span></div>
+        <div class="seq">${e.preview}…</div><div class="p3">${rows}</div></div>`;
+    }).join('');
+  }
 
-  // ── sidebar active-section tracking ──
+  function animateBars(){ requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    document.querySelectorAll('.fill[data-w]').forEach(el=>el.style.width=el.dataset.w); })); }
+
+  function renderAll(){
+    renderCards(); renderSwitcher(); renderHead(); renderComparison();
+    renderScatter(); renderBars(); renderCM(); renderDist(); renderExamples(); animateBars();
+  }
+
+  renderBinary();
+  renderAll();
+
+  /* ── sidebar active-section tracking ── */
   const links=[...document.querySelectorAll('.sidebar a[href^="#"]')];
   const byId=Object.fromEntries(links.map(a=>[a.getAttribute('href').slice(1),a]));
-  const obs=new IntersectionObserver(es=>{
-    es.forEach(en=>{ if(en.isIntersecting){ links.forEach(a=>a.classList.remove('on'));
-      (byId[en.target.id]||{}).classList?.add('on'); } });
+  const obs=new IntersectionObserver(es=>{ es.forEach(en=>{ if(en.isIntersecting){
+    links.forEach(a=>a.classList.remove('on')); (byId[en.target.id]||{}).classList?.add('on'); } });
   },{rootMargin:'-10% 0px -75% 0px'});
   ['overview','comparison','binary','embedding','perclass','confusion','distribution','examples']
     .forEach(id=>{ const el=document.getElementById(id); if(el) obs.observe(el); });
-
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    document.querySelectorAll('.fill[data-w]').forEach(el=>el.style.width=el.dataset.w); }));
-  resize();
 })();
 </script>
 </body>
