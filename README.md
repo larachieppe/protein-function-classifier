@@ -30,14 +30,21 @@ Three localization tasks at increasing granularity, all measured on held-out tes
 
 | Task | Classes | Model | Accuracy | Macro-F1 | MCC |
 |---|---|---|---|---|---|
-| **Compartment group** ⭐ | **4** | ESM-2 150M + attention pooling | **0.870** | **0.858** | **0.821** |
 | Membrane vs. soluble | 2 | ESM-2 35M | 0.865 | 0.855 | 0.722 |
+| **Compartment group** ⭐ | **4** | ESM-2 150M + attention pooling | **0.870** | **0.858** | 0.821 |
+| Well-represented compartments | 7 | ESM-2 650M *(10-class model, rare classes dropped)* | 0.865 | 0.842 | **0.830** |
 | Fine-grained localization | 10 | ESM-2 650M + attention pooling | 0.811 | 0.567 | 0.769 |
 
 **The 4-class task is the headline result** — it groups the 10 compartments by *protein-targeting
 pathway* (nucleus / cytoplasm / secretory & membrane / post-translationally imported organelles),
 which is biologically meaningful rather than arbitrary. It is balanced (34/29/19/17%), every class
 scores F1 0.71–0.93, and it runs on the small 150M model.
+
+The **7-class** row is the same 10-class model scored only on the seven compartments it actually
+predicts — the three rarest (Golgi, Lysosome/Vacuole, Peroxisome) receive *zero* predictions, so
+dropping them loses no probability mass (asserted in `src/build_7class_view.py`). It isolates how
+the model performs where it has enough data: macro-F1 jumps 0.567 → 0.842 and MCC to 0.830, the
+best of any view. It is **not** a retrained model, and it is easier by construction.
 
 Honest framing: 4-class scores higher than 10-class because the **task is easier**, not because the
 model is better. The 10-class row is the hard version — 81.1% is within the published
