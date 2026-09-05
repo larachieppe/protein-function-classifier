@@ -1,0 +1,4 @@
+# Development-only tooling (kept separate from the pinned runtime deps in
+# requirements.txt). Installed by the Claude Code SessionStart hook.
+pytest>=8.0
+ruff>=0.6.0

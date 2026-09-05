@@ -229,4 +229,11 @@ outputs/tmp/
 *.pt
 *.bin
 # keep result figures and metrics (outputs/*.png, outputs/*.json) tracked for the portfolio
-.claude/
+
+# Ignore local Claude Code state, but keep the shared SessionStart hook and
+# settings tracked so Claude Code on the web sets up the environment every session.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/hooks/*
+!.claude/hooks/session-start.sh

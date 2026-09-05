@@ -1,0 +1,26 @@
+# Tooling configuration for the protein-function-classifier project.
+# The project is script-based (no installable package), so this file only
+# configures the linter and test runner.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Notebooks use a deliberately compact, cell-oriented style (semicolons, etc.);
+# lint the library/script/test code, not the notebooks. (.venv is excluded by
+# ruff's own defaults.)
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+# Real-bug rules only: pyflakes (F: unused imports, undefined names, bad
+# f-strings), syntax errors (E9), and whitespace warnings (W). The stylistic
+# statement-compounding / single-letter-name rules (E701/E702/E741) are left
+# off on purpose because the source uses that compact style deliberately. The
+# existing `# noqa: F401` markers in src/ already assume a pyflakes linter.
+select = ["E9", "F", "W"]
+
+[tool.pytest.ini_options]
+# src/ modules import each other flatly (`from data import ...`), so put src/ on
+# the path for tests too.
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"

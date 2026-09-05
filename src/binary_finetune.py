@@ -7,11 +7,9 @@ Writes outputs/binary_metrics.json (schema consumed by the dashboard).
 """
 import argparse
 import json
-import os
 
 import numpy as np
 import pandas as pd
-import torch
 from datasets import Dataset, load_dataset
 from transformers import (
     AutoTokenizer, AutoModelForSequenceClassification,

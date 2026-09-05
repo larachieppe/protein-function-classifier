@@ -7,7 +7,6 @@ import matplotlib.ticker as ticker
 import seaborn as sns
 import pandas as pd
 import torch
-import torch.nn as nn
 from sklearn.metrics import (
     f1_score, accuracy_score, matthews_corrcoef, classification_report,
     precision_recall_curve, average_precision_score,
