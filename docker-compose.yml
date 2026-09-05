@@ -1,0 +1,32 @@
+# Docker Compose v2 configuration. Use the built-in Compose plugin:
+#
+#   docker compose up -d --build      # build the image and start the API
+#   docker compose logs -f api        # follow logs
+#   docker compose down               # stop and remove
+#
+# Invoke it as "docker compose" (a subcommand of docker), NOT the legacy
+# standalone "docker-compose" binary, which is deprecated and often not
+# installed. With Docker Desktop you also don't need "sudo".
+
+services:
+  api:
+    build: .
+    image: protein-function-classifier:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # Where serve.py loads the fine-tuned model from, inside the container.
+      MODEL_DIR: ${MODEL_DIR:-outputs/best_model}
+      MAX_LENGTH: ${MAX_LENGTH:-512}
+    volumes:
+      # Mount the model, data, and config from the host so you can update them
+      # without rebuilding the image.
+      - ./outputs:/app/outputs
+      - ./data:/app/data
+      - ./configs:/app/configs
+      # Persist Hugging Face downloads (used by the training/embedding scripts).
+      - hf-cache:/app/.cache/huggingface
+    restart: unless-stopped
+
+volumes:
+  hf-cache:

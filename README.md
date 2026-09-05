@@ -112,6 +112,58 @@ curl -X POST localhost:8000/predict -H 'content-type: application/json' \
 Returns ranked compartments with calibrated softmax confidences. The API validates
 amino-acid symbols and exposes `/labels` and `/health`.
 
+## Run with Docker
+
+Serve the API in a container — no local Python or dependency install needed. This
+uses the **Compose plugin** built into modern Docker, so invoke it as
+`docker compose` (a subcommand), **not** the old standalone `docker-compose`
+binary (deprecated, and usually not installed). With Docker Desktop you also don't
+need `sudo`. Verify your setup with `docker version` and `docker compose version`.
+
+```bash
+docker compose up -d --build          # build the image and start the API
+curl localhost:8000/health            # {"status": ..., "model_loaded": ...}
+docker compose logs -f api            # follow logs
+docker compose down                   # stop and remove
+```
+
+The service listens on **http://localhost:8000**. Once a model is available (see
+below):
+
+```bash
+curl -X POST localhost:8000/predict -H 'content-type: application/json' \
+     -d '{"sequence": "MALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKT", "top_k": 3}'
+```
+
+### Providing a model
+
+`outputs/`, `data/`, and `configs/` are **mounted from the host**, so the model
+lives outside the image. The API loads it from `MODEL_DIR` (default
+`outputs/best_model`). Fine-tuning needs a GPU, so the usual flow is to train in
+Colab / on a GPU box and drop the resulting `best_model/` into `outputs/`. Until a
+model is present the container still starts and `/health` reports
+`"model_loaded": false`, while `/predict` returns `503`. Point at a different
+location with:
+
+```bash
+MODEL_DIR=outputs/my_model docker compose up -d
+```
+
+### Running the pipeline in the container
+
+The image has every dependency, so you can run the one-off scripts through Compose
+(`--rm` removes the throwaway container afterwards); outputs are written back to
+your host `data/` and `outputs/` via the mounts:
+
+```bash
+docker compose run --rm api python src/prepare_data.py  --source deeploc-multi
+docker compose run --rm api python src/embeddings.py    --model facebook/esm2_t12_35M_UR50D
+docker compose run --rm api python src/linear_probe.py  --model facebook/esm2_t12_35M_UR50D
+docker compose run --rm api python src/umap_plot.py     --model facebook/esm2_t12_35M_UR50D
+```
+
+The image is CPU-only; for the full ESM-2 fine-tune use Colab or a GPU host.
+
 ## Project layout
 
 ```

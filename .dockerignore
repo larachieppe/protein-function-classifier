@@ -1,0 +1,49 @@
+# Keep the build context small and the image clean. Data, model weights, and
+# other large/regenerable content are provided at runtime via volumes (see
+# docker-compose.yml), not baked into the image.
+
+# Git / VCS
+.git
+.gitignore
+.gitattributes
+
+# Python caches & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# OS / editor cruft
+.DS_Store
+.vscode/
+.idea/
+.claude/
+
+# Large or regenerable content — mounted at runtime, not copied into the image
+data/
+outputs/
+notebooks/
+docs/
+*.pt
+*.bin
+*.safetensors
+
+# Docker & docs (not needed inside the image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+README.md
