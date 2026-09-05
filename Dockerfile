@@ -42,6 +42,10 @@ RUN useradd --create-home --shell /bin/bash --uid 1000 workspace \
     && mkdir -p "$HF_HOME" \
     && chown -R workspace:workspace /workspace /home/workspace
 
+# Let git operate on the bind-mounted repo even when the host owns it as a
+# different uid (prevents "detected dubious ownership in repository").
+RUN git config --system --add safe.directory /workspace
+
 # Bake the project into the image so it is usable stand-alone. During
 # development docker-compose bind-mounts the repo over this, so host edits are
 # live without a rebuild.

@@ -8,6 +8,7 @@ dashboard, without installing anything on your host except Docker.
 
 - [Prerequisites](#prerequisites)
 - [Getting started](#getting-started)
+- [Configure Git inside the workspace](#configure-git-inside-the-workspace)
 - [Running the pipeline](#running-the-pipeline)
 - [Serving the API and the dashboard](#serving-the-api-and-the-dashboard)
 - [Data & model persistence](#data--model-persistence)
@@ -58,6 +59,63 @@ across `down` / `up`. Downloaded model weights are cached in a named volume (see
 
 > One-off commands without keeping a shell open:
 > `docker compose run --rm workspace python src/prepare_data.py`
+
+## Configure Git inside the workspace
+
+`git` is preinstalled, and the image already marks `/workspace` a safe directory,
+so `git status`, `commit`, and `log` work the moment you `exec` in — no "dubious
+ownership" error even though the repo is bind-mounted from your host. Two things
+still need setting up before you can commit and push from the container.
+
+### Commit identity
+
+A fresh container has no identity. Set it inside the shell:
+
+```bash
+git config --global user.name  "Your Name"
+git config --global user.email "you@example.com"
+```
+
+That is stored in the container's `/home/workspace/.gitconfig` and is lost when
+the container is removed (`docker compose down`). To reuse your host identity
+permanently, bind-mount your host `~/.gitconfig` read-only by adding this to the
+`workspace` service's `volumes:` in `docker-compose.yml`:
+
+```yaml
+      - ${HOME}/.gitconfig:/home/workspace/.gitconfig:ro
+```
+
+Only add it if that file exists on your host — Docker would otherwise create an
+empty directory in its place. If you prefer a merge (not a rebase) when pulling,
+also run `git config --global pull.rebase false`.
+
+### Authenticating to GitHub for `push`
+
+The recommended approach keeps your keys on the host and forwards the SSH agent,
+so nothing secret is baked into the image. Add to the `workspace` service:
+
+```yaml
+# Docker Desktop (macOS / Windows)
+    environment:
+      SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
+    volumes:
+      - /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock
+
+# Linux (run `eval "$(ssh-agent)" && ssh-add` on the host first)
+    environment:
+      SSH_AUTH_SOCK: /ssh-agent
+    volumes:
+      - ${SSH_AUTH_SOCK}:/ssh-agent
+```
+
+Then `git push` and `git@github.com:` clones work from inside the container;
+verify with `ssh -T git@github.com`.
+
+Alternatives: bind-mount `~/.ssh` read-only
+(`- ${HOME}/.ssh:/home/workspace/.ssh:ro`) — simpler, but it exposes your private
+keys to the container — or use an HTTPS remote with a
+[credential helper](https://docs.github.com/en/get-started/git-basics/caching-your-github-credentials-in-git)
+or a `GITHUB_TOKEN`.
 
 ## Running the pipeline
 
