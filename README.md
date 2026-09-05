@@ -87,6 +87,25 @@ python src/linear_probe.py --model facebook/esm2_t12_35M_UR50D # baseline metric
 python src/umap_plot.py    --model facebook/esm2_t12_35M_UR50D # the embedding figure
 ```
 
+## Run with Docker
+
+Prefer a preconfigured, reproducible environment with every dependency already
+installed? Use the Docker Workspace — no local Python setup needed:
+
+```bash
+docker compose up -d workspace        # build + start the workspace
+docker compose exec workspace bash    # open a shell; run any command above
+```
+
+Or launch a single service directly:
+
+```bash
+docker compose --profile web   up site    # results dashboard -> http://localhost:8080
+docker compose --profile serve up api     # inference API     -> http://localhost:8000
+```
+
+Full walkthrough — pipeline, API, GPU, VS Code Dev Containers — in [`DOCKER.md`](DOCKER.md).
+
 ## Fine-tune (Colab / GPU)
 
 The full ESM-2 fine-tune wants a GPU. Open

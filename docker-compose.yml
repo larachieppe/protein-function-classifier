@@ -1,0 +1,61 @@
+# Docker Workspace for the Protein Subcellular Localization project.
+# See DOCKER.md for the full walkthrough.
+#
+#   docker compose build                       # build the image (first time)
+#   docker compose up -d workspace             # start the workspace in the background
+#   docker compose exec workspace bash         # open a shell inside it
+#
+#   docker compose --profile web  up site      # just serve the dashboard  -> :8080
+#   docker compose --profile serve up api      # just serve the API        -> :8000  (needs a trained model)
+
+name: protein-function-classifier
+
+# Shared definition so every service builds/uses the same image and mounts.
+x-workspace: &workspace
+  build: .
+  image: protein-function-classifier:latest
+  volumes:
+    - .:/workspace                                    # live source code
+    - hf-cache:/home/workspace/.cache/huggingface     # cache downloaded models/datasets
+
+services:
+  # The workspace you "live in": prepare data, run baselines, fine-tune, and
+  # launch the API or dashboard from inside it (both ports are published).
+  #   docker compose up -d workspace && docker compose exec workspace bash
+  workspace:
+    <<: *workspace
+    ports:
+      - "8000:8000"   # FastAPI (uvicorn)
+      - "8080:8080"   # dashboard (http.server)
+    command: ["sleep", "infinity"]
+
+  # One-command inference API. Requires a fine-tuned model in
+  # outputs/best_model (see README "Fine-tune"). Enabled by the "serve" profile
+  # so it never starts — or contends for port 8000 — unless asked for.
+  api:
+    <<: *workspace
+    profiles: ["serve"]
+    environment:
+      MODEL_DIR: outputs/best_model
+      MAX_LENGTH: "512"
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "src.serve:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # One-command static results dashboard (no model needed). Enabled by the
+  # "web" profile so it does not contend for port 8080 with the workspace.
+  site:
+    <<: *workspace
+    profiles: ["web"]
+    ports:
+      - "8080:8080"
+    command: ["python", "-m", "http.server", "-d", "docs", "8080"]
+
+volumes:
+  hf-cache:

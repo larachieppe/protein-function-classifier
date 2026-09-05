@@ -1,0 +1,40 @@
+# Keep the build context small and reproducible.
+
+# Version control / tooling
+.git
+.gitignore
+.github
+.claude
+.devcontainer
+
+# Python caches & environments
+__pycache__/
+*.py[codz]
+*.egg-info/
+.venv
+venv/
+env/
+ENV/
+.pytest_cache/
+.ipynb_checkpoints
+.ruff_cache/
+.mypy_cache/
+
+# Large / regenerated model artifacts (reproducible from training; not needed
+# in the image — they are bind-mounted or produced at runtime)
+outputs/best_model/
+outputs/checkpoint-*/
+outputs/embeddings/
+outputs/tmp/
+*.safetensors
+*.pt
+*.bin
+
+# Docker + docs that are not needed inside the image
+Dockerfile
+docker-compose.yml
+.dockerignore
+DOCKER.md
+
+# OS cruft
+.DS_Store
