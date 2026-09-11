@@ -1,0 +1,253 @@
+# =============================================================================
+# FROZEN EXPERIMENTAL CLAIM -- ultrasound directional reflux detection
+# Pulse-echo reflux-feature tracking, fundamental physics bench (Stage 3)
+# =============================================================================
+# This file is data, not documentation. Every number below is a decision rule that
+# must be signed off BEFORE any acquisition. The content hash over the `thresholds`
+# block identifies the frozen version; a bench result is reportable only against a
+# hash that predates the acquisition that produced it.
+#
+# Editing rationale text does not change the hash. Editing any number does.
+# =============================================================================
+
+version: "1.0-draft"
+status: "AWAITING SIGN-OFF -- not yet frozen"
+frozen_on: null              # set to the sign-off date; null means not frozen
+supersedes: null
+applies_to_stage: "3 - fundamental physics bench"
+
+# -----------------------------------------------------------------------------
+# 1. THE CLAIM
+# -----------------------------------------------------------------------------
+claim:
+  statement: >-
+    Under controlled bench conditions, a reflux-like event produces a repeatable
+    raw-RF feature that can be observed at two registered ureter positions and
+    correctly classified as retrograde.
+  scope_includes:
+    - "One programmable pump and one declared voiding pressure/flow waveform."
+    - "One attributed physical mechanism at a time, tested separately."
+    - "Two surveyed observation positions on the same fluid path."
+    - "Antegrade, retrograde, no-flow and apparatus-motion control trials."
+  scope_excludes:
+    - "Any statement about clinical sensitivity, specificity or predictive value."
+    - "Any statement about VUR grade."
+    - "Any statement about whether a transcutaneous window exists in a child."
+    - "Any statement about the population distribution of urine acoustic contrast."
+    - "Any statement about how often a child's ureter is apposed when reflux begins."
+  the_claim_is_not: >-
+    A demonstration that native reflux produces this feature in a living ureter. The
+    bench supplies a controlled analogue. Biological availability is a separate,
+    later, and currently unmeasured question.
+
+# -----------------------------------------------------------------------------
+# 2. THE THREE OUTCOMES (per side, per event)
+# -----------------------------------------------------------------------------
+outcomes:
+  positive:
+    label: "Retrograde feature detected"
+    all_of:
+      - "A candidate feature clears the detection thresholds in section 3."
+      - "The feature is attributed to a declared mechanism by its controls."
+      - "The same attributed feature is identified at both registered positions."
+      - "Arrival order is bladder-side first, kidney-side second."
+      - "The track satisfies every tracking and accuracy threshold."
+      - "Motion correction and registration quality flags are all within limits."
+  negative:
+    label: "No retrograde feature under adequate observability"
+    all_of:
+      - "Both registered positions were observed for the whole declared event window."
+      - "The instrument-health and observability preconditions in section 7 all passed."
+      - "No candidate cleared the detection thresholds."
+    note: >-
+      A negative requires demonstrated observability. "Not seen" must never be
+      recorded as "not present" without it.
+  indeterminate:
+    label: "Not adequately observed"
+    any_of:
+      - "One or both positions were not observed for the whole event window."
+      - "Receiver saturation, clipping or gain change occurred inside the gate."
+      - "A candidate cleared detection but could not be attributed to a mechanism."
+      - "Correlation, peak-ambiguity or motion-quality flags failed."
+      - "The feature left the field before the minimum track was accumulated."
+      - "Two or more candidates were mutually inconsistent in direction."
+    note: >-
+      Indeterminate is a first-class outcome and must be reported at the same
+      prominence as positive and negative. Its rate is a primary result, not a
+      footnote.
+
+# -----------------------------------------------------------------------------
+# 3. THRESHOLDS  (the hashed block -- changing any number changes the version)
+# -----------------------------------------------------------------------------
+thresholds:
+
+  detection:
+    # Integrated, gain-corrected energy in a predetermined gate. Never a single
+    # favourable voltage sample.
+    fbr_min_db: 6.0
+    fbr_marginal_band_db: [0.0, 6.0]
+    estimator_floor_db: -10.0
+    snr_vs_noise_min_db: 20.0
+    false_alarm_max: 0.05
+    gate_defined_before_unblinding: true
+    same_gate_gain_bandwidth_as_control: true
+
+  direction:
+    correct_direction_min: 0.90
+    correct_direction_lower_bound: 0.80
+    direction_false_alarm_max: 0.01
+    antegrade_trials_must_classify_antegrade: true
+    both_positions_required: true
+
+  tracking:
+    min_consecutive_estimates: 10
+    min_track_duration_s: 0.020
+    min_displacement_m: 0.0010
+    min_resolution_cells: 3.0
+    min_correlation: 0.60
+    max_peak_ambiguity_ratio: 0.70
+
+  accuracy:
+    displacement_precision_max_m: 0.00015
+    position_rms_max_m: 0.00050
+    position_bias_max_m: 0.00030
+    speed_error_max_frac: 0.20
+    speed_error_floor_m_s: 0.010
+    direction_sign_errors_allowed_in_qualified_set: 0
+
+  repeatability:
+    min_preparations: 3
+    min_repeats_per_preparation: 5
+    max_between_preparation_spread_db: 3.0
+    max_between_to_within_variance_ratio: 1.0
+    outcome_must_be_invariant_across_preparations: true
+
+  stopping:
+    # A mechanism is closed only in its most favourable declared geometry, only
+    # under its own conditions, and only with its positive control passing in the
+    # same session. Each entry states what the closure does NOT close.
+    min_trials_before_closure: 20
+    require_positive_control_in_same_session: true
+    closure_confidence: 0.95
+    max_campaign_days_per_mechanism: 10
+
+statistics:
+  alpha: 0.05
+  interval_method: "Clopper-Pearson exact"
+  analyses_frozen_before_blinded_runs: true
+  blinded_condition_identifier_required: true
+
+# -----------------------------------------------------------------------------
+# 4. PER-MECHANISM STOPPING RULES
+# -----------------------------------------------------------------------------
+stopping_rules:
+  M1:
+    name: "Native distributed backscatter"
+    stop_when: >-
+      Bulk-fluid return from a gate placed wholly inside homogeneous flowing urine
+      stays below the electronic noise floor at maximum legitimate averaging, in the
+      most favourable geometry, while the seeded-particle positive control at a known
+      concentration is recovered in the same session at the same settings.
+    does_not_close: >-
+      Any of M2-M6. Urine with no distributed scatter can still reflect at a boundary
+      with a second fluid or at an opening lumen wall.
+    downstream: "The native-urine VFI branch is unsupported. Seeded-fluid success alone never revives it."
+  M2:
+    name: "Urine-urine impedance gradient"
+    stop_when: >-
+      No gradient-attributable echo at dSG = 0.016 in the most favourable controlled
+      geometry, with the stationary mismatched interface confirming in the same session
+      that the chain can see a boundary at all.
+    does_not_close: >-
+      M4 and M5, which need no fluid-fluid contrast. Failure only at dSG = 0.002 closes
+      nothing but the low-contrast corner, and does NOT identify which VUR grades would
+      be missed.
+    downstream: "Redesign or close the fluid-gradient branch; do not claim that all ultrasound observables failed."
+  M3:
+    name: "Diffuse mixing / turbulence"
+    stop_when: >-
+      No return above the matched-fluid turbulent control across the whole dSG band at
+      the flow rates the declared voiding waveform actually produces, AND the measured
+      frequency exponent is inconsistent with diffuse scattering.
+    does_not_close: >-
+      The coherent mechanisms. A diffuse null is also a statement about the flow regime,
+      not only about acoustics.
+    downstream: "Record the flow regime achieved; a laminar bench cannot close a turbulent mechanism."
+  M4:
+    name: "Lumen opening"
+    stop_when: >-
+      A controlled collapsible tube driven through a full opening cycle produces no
+      repeatable moving RF feature in the most favourable controlled geometry, with
+      synchronised optical imaging confirming the lumen actually opened.
+    does_not_close: >-
+      How often a child's ureter is apposed when reflux begins. That prevalence is
+      unmeasured, and this mechanism is conditional on it.
+    downstream: "If only M4 survives, the programme must explicitly pivot and establish that lumen opening is a reliable consequence of reflux."
+  M5:
+    name: "Ureter-wall motion"
+    stop_when: >-
+      Retrograde wall-motion sequences cannot be separated from simulated antegrade
+      peristalsis, rigid-body fixture translation and pump vibration at the frozen
+      direction threshold.
+    does_not_close: >-
+      The fluid mechanisms. Note the asymmetric risk: this mechanism is the most likely
+      to succeed on a bench that has no breathing, no bladder contraction and no
+      operator hand tremor.
+    downstream: "A bench success here must carry an explicit motion-rejection budget to the next stage."
+  M6:
+    name: "Composite wall-fluid change"
+    stop_when: "Never on its own. Closed only by the closure of every component."
+    does_not_close: >-
+      Anything. The destructive corner of the composite is weaker than its strongest
+      component, so a composite claim can never rescue a component that failed alone.
+    downstream: "Evaluate only after components are measured separately, and only with a measured phase relationship."
+  programme:
+    stop_when: >-
+      Every candidate mechanism fails under its own most favourable controlled geometry,
+      with all positive controls passing.
+    action: >-
+      Stop the acoustic branch before an array or an anthropomorphic phantom is
+      purchased. Publish the measured null with its link budget.
+
+# -----------------------------------------------------------------------------
+# 5. PRECONDITIONS -- checked before any trial counts
+# -----------------------------------------------------------------------------
+preconditions:
+  instrument:
+    - "Impulse response, bandwidth and ring-down measured and logged this session."
+    - "Receiver gain linearity verified; no clipping or compression in the gate."
+    - "Electronic noise floor recorded from terminated and pre-trigger records."
+    - "No depth-varying TGC anywhere in the primary ratio."
+    - "Timing jitter and calibration drift within declared limits."
+  fluids:
+    - "Density and sound speed measured for every preparation at acquisition temperature."
+    - "Impedance computed as Z = rho*c and reported with uncertainty."
+    - "Specific gravity recorded, but never substituted for Z."
+  geometry:
+    - "Transducer pose mechanically surveyed; angle and standoff logged."
+    - "Both observation positions surveyed and registered to the optical truth frame."
+  record:
+    - "Unprocessed RF and sample clock stored. Processed images are derived products."
+    - "Algorithm version and blinded condition identifier stored with every acquisition."
+
+# -----------------------------------------------------------------------------
+# 6. WHAT WOULD MAKE THIS CLAIM WRONG
+# -----------------------------------------------------------------------------
+falsifiers:
+  - "A feature clearing every threshold in the matched-fluid control: the echo was never the gradient."
+  - "A feature clearing every threshold under rigid-body fixture translation alone."
+  - "Direction classified retrograde in antegrade-flow trials above the false-alarm ceiling."
+  - "Outcome flipping between independent fluid preparations of the same nominal contrast."
+  - "Feature energy tracking receiver gain rather than the declared mechanism variable."
+
+# -----------------------------------------------------------------------------
+# 7. SIGN-OFF
+# -----------------------------------------------------------------------------
+sign_off:
+  physics_lead: null
+  clinical_lead: null
+  statistics_reviewer: null
+  date: null
+  note: >-
+    Freezing means all three sign-offs are present and the content hash is recorded in
+    the acquisition log before the first trial. Until then this file is a proposal.

@@ -1,0 +1,1226 @@
+{
+  "threshold_db": 6.0,
+  "estimator_floor_db": -10.0,
+  "link_budget": {
+    "M1": {
+      "favourable": {
+        "fbr_p10": -77.77288995805212,
+        "fbr_p50": -55.73747331048136,
+        "fbr_p90": -33.62395965995169,
+        "detect_fraction": 0.0,
+        "tol_capture_p50": -49.73747331048136,
+        "tol_capture_p90": -27.623959659951687
+      },
+      "middle": {
+        "fbr_p10": -87.77288995805212,
+        "fbr_p50": -65.73747331048135,
+        "fbr_p90": -43.62395965995168,
+        "detect_fraction": 0.0,
+        "tol_capture_p50": -59.73747331048135,
+        "tol_capture_p90": -37.62395965995168
+      },
+      "worst": {
+        "fbr_p10": -97.77288995805212,
+        "fbr_p50": -75.73747331048135,
+        "fbr_p90": -53.62395965995168,
+        "detect_fraction": 0.0,
+        "tol_capture_p50": -69.73747331048135,
+        "tol_capture_p90": -47.62395965995168
+      }
+    },
+    "M2": {
+      "favourable": {
+        "fbr_p10": -200.0,
+        "fbr_p50": -77.80346615949354,
+        "fbr_p90": -13.506094163775412,
+        "detect_fraction": 0.011933333333333334,
+        "tol_capture_p50": -71.80346615949354,
+        "tol_capture_p90": -7.506094163775413
+      },
+      "middle": {
+        "fbr_p10": -200.0,
+        "fbr_p50": -87.80346615949354,
+        "fbr_p90": -23.506094163775405,
+        "detect_fraction": 0.0004,
+        "tol_capture_p50": -81.80346615949354,
+        "tol_capture_p90": -17.506094163775405
+      },
+      "worst": {
+        "fbr_p10": -200.0,
+        "fbr_p50": -97.80346615949354,
+        "fbr_p90": -33.50609416377541,
+        "detect_fraction": 0.0,
+        "tol_capture_p50": -91.80346615949354,
+        "tol_capture_p90": -27.506094163775405
+      }
+    },
+    "M3": {
+      "favourable": {
+        "fbr_p10": -109.57056452076587,
+        "fbr_p50": -75.77773532263191,
+        "fbr_p90": -41.51887489861412,
+        "detect_fraction": 0.0,
+        "tol_capture_p50": -69.77773532263191,
+        "tol_capture_p90": -35.51887489861412
+      },
+      "middle": {
+        "fbr_p10": -119.57056452076587,
+        "fbr_p50": -85.77773532263191,
+        "fbr_p90": -51.518874898614115,
+        "detect_fraction": 0.0,
+        "tol_capture_p50": -79.77773532263191,
+        "tol_capture_p90": -45.518874898614115
+      },
+      "worst": {
+        "fbr_p10": -129.57056452076588,
+        "fbr_p50": -95.77773532263191,
+        "fbr_p90": -61.518874898614115,
+        "detect_fraction": 0.0,
+        "tol_capture_p50": -89.77773532263191,
+        "tol_capture_p90": -55.518874898614115
+      }
+    },
+    "M4": {
+      "favourable": {
+        "fbr_p10": -14.584581179112133,
+        "fbr_p50": 6.626633485398994,
+        "fbr_p90": 19.200083123278244,
+        "detect_fraction": 0.5215666666666666,
+        "tol_capture_p50": 12.626633485398994,
+        "tol_capture_p90": 25.200083123278244
+      },
+      "middle": {
+        "fbr_p10": -24.584581179112128,
+        "fbr_p50": -3.373366514600999,
+        "fbr_p90": 9.200083123278253,
+        "detect_fraction": 0.18096666666666666,
+        "tol_capture_p50": 2.626633485399001,
+        "tol_capture_p90": 15.200083123278253
+      },
+      "worst": {
+        "fbr_p10": -34.58458117911213,
+        "fbr_p50": -13.373366514600999,
+        "fbr_p90": -0.7999168767217482,
+        "detect_fraction": 0.0146,
+        "tol_capture_p50": -7.373366514600999,
+        "tol_capture_p90": 5.200083123278252
+      }
+    },
+    "M5": {
+      "favourable": {
+        "fbr_p10": 1.8497428075863873,
+        "fbr_p50": 15.202057547388243,
+        "fbr_p90": 24.4750572515649,
+        "detect_fraction": 0.8245333333333333,
+        "tol_capture_p50": 21.202057547388243,
+        "tol_capture_p90": 30.4750572515649
+      },
+      "middle": {
+        "fbr_p10": -8.150257192413605,
+        "fbr_p50": 5.20205754738825,
+        "fbr_p90": 14.475057251564907,
+        "detect_fraction": 0.4624333333333333,
+        "tol_capture_p50": 11.20205754738825,
+        "tol_capture_p90": 20.475057251564905
+      },
+      "worst": {
+        "fbr_p10": -18.150257192413605,
+        "fbr_p50": -4.79794245261175,
+        "fbr_p90": 4.475057251564907,
+        "detect_fraction": 0.0608,
+        "tol_capture_p50": 1.2020575473882502,
+        "tol_capture_p90": 10.475057251564907
+      }
+    },
+    "M6": {
+      "favourable": {
+        "fbr_p10": -14.88632777803899,
+        "fbr_p50": 6.3547250459217395,
+        "fbr_p90": 19.06085368060101,
+        "detect_fraction": 0.5108,
+        "tol_capture_p50": 12.35472504592174,
+        "tol_capture_p90": 25.06085368060101
+      },
+      "middle": {
+        "fbr_p10": -24.886327778038982,
+        "fbr_p50": -3.6452749540782534,
+        "fbr_p90": 9.060853680601019,
+        "detect_fraction": 0.17633333333333334,
+        "tol_capture_p50": 2.3547250459217466,
+        "tol_capture_p90": 15.060853680601019
+      },
+      "worst": {
+        "fbr_p10": -34.88632777803898,
+        "fbr_p50": -13.645274954078253,
+        "fbr_p90": -0.939146319398982,
+        "detect_fraction": 0.0141,
+        "tol_capture_p50": -7.645274954078253,
+        "tol_capture_p90": 5.060853680601018
+      }
+    }
+  },
+  "inherited": {
+    "recovered_backgrounds_db": [
+      -66.59700043360188,
+      -56.59700043360188,
+      -46.59700043360188
+    ],
+    "recovered_dc_drho": 1.4624133933758712,
+    "table10_reproduction": [
+      {
+        "row": "empty-fill leading edge",
+        "r_p": 0.032,
+        "signal_db": -29.897000433601878,
+        "model": [
+          46.7,
+          36.7,
+          26.7
+        ],
+        "published": [
+          46.7,
+          36.7,
+          26.7
+        ],
+        "max_abs_error_db": 0.0
+      },
+      {
+        "row": "dSG = 0.016 fluid-fluid",
+        "r_p": 0.015517744772069589,
+        "signal_db": -36.18342790925473,
+        "model": [
+          40.413572524347146,
+          30.413572524347146,
+          20.413572524347146
+        ],
+        "published": [
+          40.5,
+          30.5,
+          20.5
+        ],
+        "max_abs_error_db": 0.08642747565285447
+      },
+      {
+        "row": "dSG = 0.002 fluid-fluid",
+        "r_p": 0.0019397180965086986,
+        "signal_db": -54.24522764909361,
+        "model": [
+          22.35177278450827,
+          12.35177278450827,
+          2.3517727845082703
+        ],
+        "published": [
+          22.5,
+          12.5,
+          2.5
+        ],
+        "max_abs_error_db": 0.14822721549172968
+      }
+    ]
+  },
+  "m2_targets": {
+    "required_fG_p10": 0.2959996052798881,
+    "required_fG_p50": 0.6846638483042928,
+    "required_fG_p90": 2.247144112115538,
+    "required_fG_no_attenuation_p50": 0.06145775329772917,
+    "required_fG_inherited_conditions_p50": 0.009740397482552555,
+    "infeasible_fraction": 0.32726666666666665,
+    "attenuation_penalty_factor": 11.14039826655347,
+    "edge_f1": {
+      "impossible_fraction": 0.3272666666666667,
+      "p10": 15.30587907434177,
+      "p50": 33.781805774128586,
+      "p90": 49.55213833496567
+    },
+    "edge_f01": {
+      "impossible_fraction": 1.0,
+      "p10": null,
+      "p50": null,
+      "p90": null
+    },
+    "edge_f1_at_inherited_threshold": {
+      "impossible_fraction": 0.011833333333333362,
+      "p10": 44.11121589437245,
+      "p50": 68.79950326443803,
+      "p90": 85.1272386196015
+    },
+    "profile_shape_sensitivity_um": {
+      "tanh": 33.781805774128586,
+      "linear": 92.50641057940112,
+      "gaussian": 28.712206874104496
+    }
+  },
+  "m1_targets": {
+    "required_bsc": {
+      "clutter_0dB": {
+        "p10": 0.468803168766433,
+        "p50": 3.9259384258826304,
+        "p90": 62.16148764581925
+      },
+      "clutter_5dB": {
+        "p10": 0.14824857876062375,
+        "p50": 1.2414907379365254,
+        "p90": 19.65718837052069
+      },
+      "clutter_10dB": {
+        "p10": 0.046880316876643305,
+        "p50": 0.392593842588263,
+        "p90": 6.2161487645819244
+      },
+      "clutter_20dB": {
+        "p10": 0.0046880316876643305,
+        "p50": 0.0392593842588263,
+        "p90": 0.6216148764581925
+      }
+    },
+    "blood_reference": [
+      0.001,
+      0.02
+    ],
+    "instrument_floor_bsc_p50": 0.0004507580421450905
+  },
+  "m4_targets": {
+    "cancellation_scale_um": 25.732516030284117,
+    "quarter_wave_um": 77.0,
+    "collapsed_film_bracket_um": [
+      0.0,
+      300.0
+    ]
+  },
+  "m5_targets": {
+    "rejection_db_for_50um_signal": [
+      41.601303742510936,
+      45.95717366873283,
+      49.83921305680778
+    ],
+    "rejection_db_for_200um_signal": [
+      29.56010391595169,
+      33.915973842173585,
+      37.798013230248536
+    ],
+    "rejection_db_for_500um_signal": [
+      21.60130374251094,
+      25.95717366873283,
+      29.839213056807786
+    ]
+  },
+  "frequency": {
+    "f_hz": [
+      1000000.0,
+      2000000.0,
+      3000000.0,
+      4000000.0,
+      5000000.0,
+      7000000.0,
+      10000000.0
+    ],
+    "permitted": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "f0_min_resolution_hz": 2566666.666666667,
+    "wall_separation_req_m": 0.0005,
+    "median_fbr_db": {
+      "M1": [
+        -31.44425361573216,
+        -38.84491583489692,
+        -44.80171700069168,
+        -50.30799128727205,
+        -55.50707965638952,
+        -65.52750920552596,
+        -80.0207442834446
+      ],
+      "M2": [
+        -20.38508645701078,
+        -33.11258922487487,
+        -45.33450943813717,
+        -60.18825711442374,
+        -77.54088627213481,
+        -113.90242641138313,
+        -171.5938423868256
+      ],
+      "M3": [
+        -54.46265131262737,
+        -59.623052537150045,
+        -65.19117164714041,
+        -70.67001849480657,
+        -76.31451090737868,
+        -88.22109895919283,
+        -105.21349217944781
+      ],
+      "M4": [
+        24.137089868245045,
+        19.075531322737504,
+        15.35375745457117,
+        11.393709481250845,
+        6.778543525431402,
+        -6.555217553366653,
+        -67.7947960868922
+      ],
+      "M5": [
+        32.79837945263096,
+        28.355686588807153,
+        23.992955491375618,
+        19.64724653962928,
+        15.326971756933137,
+        6.870877243660168,
+        -5.878228527053672
+      ],
+      "M6": [
+        23.3596337146907,
+        18.411158801259212,
+        14.86696141530522,
+        11.070327030879604,
+        6.482392699081025,
+        -6.497271244579608,
+        -40.42086477192263
+      ]
+    },
+    "detect_fraction": {
+      "M1": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "M2": [
+        0.188375,
+        0.106375,
+        0.059375,
+        0.026875,
+        0.01125,
+        0.001125,
+        0.0
+      ],
+      "M3": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "M4": [
+        0.9025,
+        0.862625,
+        0.78975,
+        0.683625,
+        0.5255,
+        0.214625,
+        0.035875
+      ],
+      "M5": [
+        0.98975,
+        0.98075,
+        0.9635,
+        0.923625,
+        0.82825,
+        0.52925,
+        0.17625
+      ],
+      "M6": [
+        0.89025,
+        0.8445,
+        0.7765,
+        0.672375,
+        0.5155,
+        0.210875,
+        0.035375
+      ]
+    },
+    "best_f_hz": {
+      "M1": 3000000.0,
+      "M2": 3000000.0,
+      "M3": 3000000.0,
+      "M4": 3000000.0,
+      "M5": 3000000.0,
+      "M6": 3000000.0
+    },
+    "penalty_across_band_db": {
+      "M1": 35.21902728275292,
+      "M2": 126.25933294868844,
+      "M3": 40.022320532307404,
+      "M4": 83.14855354146337,
+      "M5": 29.87118401842929,
+      "M6": 55.28782618722785
+    }
+  },
+  "bandwidth": {
+    "resolve_open_lumen_hz": 770000.0,
+    "separate_from_wall_hz": 1540000.0,
+    "resolve_leading_edge_hz": 7700000.0,
+    "exponent_sigma": 0.2599332155340872,
+    "band_ratio": 3.5,
+    "recommended_f_lo_hz": 2000000.0,
+    "recommended_f_hi_hz": 7000000.0,
+    "recommended_f0_hz": 4000000.0,
+    "recommended_bw_hz": 5000000.0,
+    "recommended_frac_bw": 1.25,
+    "f0_floor_at_recommended_bw_hz": 1232000.0,
+    "frac_bw_for_position_target": 1.9557550169627107
+  },
+  "sampling": {
+    "samples_per_cycle": [
+      2.5,
+      3.0,
+      4.0,
+      6.0,
+      8.0,
+      10.0,
+      16.0,
+      20.0
+    ],
+    "peak_abs_error_samples": [
+      2.6435657810715205,
+      0.12252232884577968,
+      0.056126314621922,
+      0.022608025273235022,
+      0.013521032212737205,
+      0.00911014765495699,
+      0.00487109314077061,
+      0.0033503748161318736
+    ],
+    "peak_bias_um": [
+      162.84365211400566,
+      6.289479547416691,
+      2.1608631129439964,
+      0.5802726486796989,
+      0.2602798700951912,
+      0.14029627388633764,
+      0.04688427147991713,
+      0.02579788608421543
+    ],
+    "budget_um": 150.0,
+    "criterion_um": 15.0,
+    "chosen_samples_per_cycle": 3.0,
+    "bias_limited_fs_hz": 15000000.0,
+    "nyquist_limited_fs_hz": 18750000.0,
+    "required_fs_hz": 18750000.0,
+    "binding": "Nyquist over the 2.5-7.5 MHz band"
+  },
+  "prf": [
+    {
+      "v": 0.02,
+      "depth": 0.035,
+      "phase": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 259.7402597402597,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 259.7402597402597,
+        "feasible": true,
+        "margin_db": 18.309733973226507,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 53.333333333333336,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 200.0,
+        "feasible": true,
+        "margin_db": 19.444826721501688,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.02,
+      "depth": 0.06,
+      "phase": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 259.7402597402597,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 259.7402597402597,
+        "feasible": true,
+        "margin_db": 15.968901912892825,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 53.333333333333336,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 200.0,
+        "feasible": true,
+        "margin_db": 17.103994661168006,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.02,
+      "depth": 0.08,
+      "phase": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 259.7402597402597,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 259.7402597402597,
+        "feasible": true,
+        "margin_db": 14.719514546809826,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 53.333333333333336,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 200.0,
+        "feasible": true,
+        "margin_db": 15.854607295085007,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.1,
+      "depth": 0.035,
+      "phase": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 1298.7012987012988,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 1298.7012987012988,
+        "feasible": true,
+        "margin_db": 11.320033929866318,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 266.6666666666667,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 266.6666666666667,
+        "feasible": true,
+        "margin_db": 18.19543935541869,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.1,
+      "depth": 0.06,
+      "phase": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 1298.7012987012988,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 1298.7012987012988,
+        "feasible": true,
+        "margin_db": 8.979201869532638,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 266.6666666666667,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 266.6666666666667,
+        "feasible": true,
+        "margin_db": 15.854607295085007,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.1,
+      "depth": 0.08,
+      "phase": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 1298.7012987012988,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 1298.7012987012988,
+        "feasible": true,
+        "margin_db": 7.729814503449637,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 266.6666666666667,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 266.6666666666667,
+        "feasible": true,
+        "margin_db": 14.605219929002008,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.3,
+      "depth": 0.035,
+      "phase": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 3896.1038961038957,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 3896.1038961038957,
+        "feasible": true,
+        "margin_db": 6.548821382669693,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 800.0,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 800.0,
+        "feasible": true,
+        "margin_db": 13.424226808222063,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.3,
+      "depth": 0.06,
+      "phase": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 3896.1038961038957,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 3896.1038961038957,
+        "feasible": true,
+        "margin_db": 4.207989322336013,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 800.0,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 800.0,
+        "feasible": true,
+        "margin_db": 11.083394747888384,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.3,
+      "depth": 0.08,
+      "phase": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 3896.1038961038957,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 3896.1038961038957,
+        "feasible": true,
+        "margin_db": 2.958601956253013,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 800.0,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 800.0,
+        "feasible": true,
+        "margin_db": 9.834007381805383,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.5,
+      "depth": 0.035,
+      "phase": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 6493.506493506494,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 6493.506493506494,
+        "feasible": true,
+        "margin_db": 4.330333886506129,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 1333.3333333333333,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 1333.3333333333333,
+        "feasible": true,
+        "margin_db": 11.205739312058501,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.5,
+      "depth": 0.06,
+      "phase": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 6493.506493506494,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 6493.506493506494,
+        "feasible": true,
+        "margin_db": 1.9895018261724495,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 1333.3333333333333,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 1333.3333333333333,
+        "feasible": true,
+        "margin_db": 8.86490725172482,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.5,
+      "depth": 0.08,
+      "phase": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 6493.506493506494,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 6493.506493506494,
+        "feasible": true,
+        "margin_db": 0.7401144600894493,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 1333.3333333333333,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 1333.3333333333333,
+        "feasible": true,
+        "margin_db": 7.615519885641819,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.8,
+      "depth": 0.035,
+      "phase": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 10389.61038961039,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 10389.61038961039,
+        "feasible": true,
+        "margin_db": 2.2891340599468806,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 17600.0,
+        "prf_min_motion_hz": 2133.3333333333335,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 2133.3333333333335,
+        "feasible": true,
+        "margin_db": 9.164539485499251,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.8,
+      "depth": 0.06,
+      "phase": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 10389.61038961039,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 10389.61038961039,
+        "feasible": false,
+        "margin_db": -0.05169800038679853,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 10266.666666666668,
+        "prf_min_motion_hz": 2133.3333333333335,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 2133.3333333333335,
+        "feasible": true,
+        "margin_db": 6.823707425165571,
+        "domain": "window"
+      }
+    },
+    {
+      "v": 0.8,
+      "depth": 0.08,
+      "phase": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 10389.61038961039,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 10389.61038961039,
+        "feasible": false,
+        "margin_db": -1.3010853664697988,
+        "domain": "phase"
+      },
+      "window": {
+        "prf_max_range_hz": 7700.0,
+        "prf_min_motion_hz": 2133.3333333333335,
+        "prf_min_track_hz": 200.0,
+        "prf_min_hz": 2133.3333333333335,
+        "feasible": true,
+        "margin_db": 5.574320059082572,
+        "domain": "window"
+      }
+    }
+  ],
+  "depth": {
+    "required_lo_m": 0.02,
+    "required_hi_m": 0.08,
+    "provisional_element_coverage_m": [
+      0.032159400000000005,
+      0.0518406
+    ],
+    "tiles_f3": [
+      [
+        0.0275,
+        0.02,
+        0.035
+      ],
+      [
+        0.0425,
+        0.035,
+        0.05
+      ],
+      [
+        0.0575,
+        0.05,
+        0.065
+      ],
+      [
+        0.07250000000000001,
+        0.065,
+        0.08
+      ]
+    ],
+    "tiles_f2": [
+      [
+        0.024285714285714285,
+        0.02,
+        0.028571428571428574
+      ],
+      [
+        0.03285714285714286,
+        0.028571428571428574,
+        0.037142857142857144
+      ],
+      [
+        0.04142857142857143,
+        0.037142857142857144,
+        0.045714285714285714
+      ],
+      [
+        0.05000000000000001,
+        0.04571428571428572,
+        0.05428571428571429
+      ],
+      [
+        0.05857142857142857,
+        0.054285714285714284,
+        0.06285714285714286
+      ],
+      [
+        0.06714285714285714,
+        0.06285714285714286,
+        0.07142857142857144
+      ],
+      [
+        0.07571428571428572,
+        0.07142857142857144,
+        0.08000000000000002
+      ]
+    ],
+    "attenuation_db_at_hi": 40.0,
+    "attenuation_db_at_lo": 10.0
+  },
+  "angle": {
+    "wide_reflector_5mm": {
+      "specular_fwhm_deg": 3.529420018005871,
+      "max_step_deg": 1.1764733393352904,
+      "span_deg": 40.0,
+      "n_angles": 69,
+      "note": "A diffuse return is broad and flat; a specular return is this narrow. Sweeping coarser than max_step risks closing a live mechanism."
+    },
+    "narrow_reflector_2mm": {
+      "specular_fwhm_deg": 8.823550045014677,
+      "max_step_deg": 2.941183348338226,
+      "span_deg": 40.0,
+      "n_angles": 29,
+      "note": "A diffuse return is broad and flat; a specular return is this narrow. Sweeping coarser than max_step risks closing a live mechanism."
+    }
+  },
+  "aperture": {
+    "apertures_m": [
+      0.004,
+      0.006,
+      0.009,
+      0.0138,
+      0.019
+    ],
+    "diffuse_prediction_db": [
+      0.0,
+      3.5218251811136247,
+      7.0436503622272495,
+      10.756381901465481,
+      13.53387219249733
+    ],
+    "specular_prediction_db": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "separation_db": [
+      0.0,
+      3.5218251811136247,
+      7.0436503622272495,
+      10.756381901465481,
+      13.53387219249733
+    ]
+  },
+  "two_point": {
+    "sigma_onset_2ms": {
+      "feasible_fraction": 0.9496333333333333,
+      "recommended_mm": [
+        1.8849600000000002,
+        4.875887121311893,
+        29.375223538958807
+      ],
+      "lifetime_criterion_ms": 6.0
+    },
+    "sigma_onset_10ms": {
+      "feasible_fraction": 0.9496333333333333,
+      "recommended_mm": [
+        1.9478154602781317,
+        10.902815053869153,
+        59.2568573055673
+      ],
+      "lifetime_criterion_ms": 30.0
+    },
+    "sigma_onset_20ms": {
+      "feasible_fraction": 0.9189333333333334,
+      "recommended_mm": [
+        2.755224908029081,
+        15.79076535766702,
+        64.78889478466826
+      ],
+      "lifetime_criterion_ms": 60.0
+    },
+    "fixed_separation_for_1pct_direction_error_mm": {
+      "v_20mm_s": 0.6579905428532752,
+      "v_100mm_s": 3.2899527142663754,
+      "v_500mm_s": 16.44976357133188,
+      "v_800mm_s": 26.319621714131003
+    },
+    "acoustic_minimum_mm": 1.8849600000000002
+  },
+  "receiver": {
+    "dynamic_range_db": 72.6,
+    "enob_moving_feature": 11.94210959853805,
+    "bits_moving_feature": 14,
+    "enob_static_averaged": 8.941810638431924,
+    "processing_gain_db": 4.948500216800941,
+    "averaging_gain_db": 18.06179973983887,
+    "max_input_noise_v_rms": 0.00023442288153199226,
+    "thermal_floor_v_rms": 1.9846224231074382e-06,
+    "strongest_in_gate_db": -20.0,
+    "weakest_required_db": -86.6,
+    "background_db": -66.6,
+    "snr_margin_db": 20.0
+  },
+  "precision_um": {
+    "FBR -10 dB, rho 0.6 \u2014 at the estimator floor, heavy decorrelation": 255.24428486345937,
+    "FBR +0 dB, rho 0.8 \u2014 at 0 dB FBR, good correlation": 31.9478226186816,
+    "FBR +6 dB, rho 0.8 \u2014 at the frozen threshold, good correlation": 16.766928299623842,
+    "FBR +6 dB, rho 0.3 \u2014 at the frozen threshold, severe decorrelation": 56.45546572464198
+  },
+  "precision_budget_um": 150.0,
+  "precision_floor_fbr_db": {
+    "rho_0.9": -9.407105459191811,
+    "rho_0.6": -7.389864208699914,
+    "rho_0.3": -3.5049981882635066
+  },
+  "fluids": {
+    "ladder": [
+      {
+        "dsg": 0.002,
+        "delta_rho_kg_m3": 2.0,
+        "r_p_range": [
+          0.001314774334576315,
+          0.002418670438472419
+        ],
+        "R_I_db_range": [
+          -57.6229756455149,
+          -52.32846606809491
+        ]
+      },
+      {
+        "dsg": 0.004,
+        "delta_rho_kg_m3": 4.0,
+        "r_p_range": [
+          0.00262954866915263,
+          0.004837340876944838
+        ],
+        "R_I_db_range": [
+          -51.602375732235274,
+          -46.30786615481529
+        ]
+      },
+      {
+        "dsg": 0.006,
+        "delta_rho_kg_m3": 6.0,
+        "r_p_range": [
+          0.003944323003728945,
+          0.007256011315417256
+        ],
+        "R_I_db_range": [
+          -48.08055055112165,
+          -42.78604097370166
+        ]
+      },
+      {
+        "dsg": 0.008,
+        "delta_rho_kg_m3": 8.0,
+        "r_p_range": [
+          0.00525909733830526,
+          0.009674681753889676
+        ],
+        "R_I_db_range": [
+          -45.58177581895565,
+          -40.28726624153566
+        ]
+      },
+      {
+        "dsg": 0.01,
+        "delta_rho_kg_m3": 10.0,
+        "r_p_range": [
+          0.006573871672881574,
+          0.012093352192362093
+        ],
+        "R_I_db_range": [
+          -43.643575558794524,
+          -38.34906598137454
+        ]
+      },
+      {
+        "dsg": 0.013,
+        "delta_rho_kg_m3": 13.0,
+        "r_p_range": [
+          0.008546033174746046,
+          0.01572135785007072
+        ],
+        "R_I_db_range": [
+          -41.364708512657785,
+          -36.0701989352378
+        ]
+      },
+      {
+        "dsg": 0.016,
+        "delta_rho_kg_m3": 16.0,
+        "r_p_range": [
+          0.01051819467661052,
+          0.01934936350777935
+        ],
+        "R_I_db_range": [
+          -39.56117590567602,
+          -34.266666328256036
+        ]
+      }
+    ],
+    "note": "Every preparation must have rho and c measured independently at the acquisition temperature. The dc/drho bracket alone spreads the reflected intensity by about 5 dB at every step, which is why specific gravity cannot be the calibration variable.",
+    "spread_db": 5.294509577419991
+  },
+  "closure": [
+    {
+      "key": "M1",
+      "name": "Native distributed backscatter",
+      "favourable_config": "Gate wholly inside homogeneous flowing urine, shallowest declared depth, no wall in gate, maximum legitimate coherent averaging",
+      "decisive_measurement": "Backscatter coefficient of the fluid, in 1/(m sr), measured against the terminated-receiver noise floor with the seeded ladder as positive control",
+      "predicted_if_live_db": "-78 / -56 / -34 (10/50/90 pct)",
+      "null_prediction": "Gate placed wholly inside homogeneous flowing urine returns nothing above the electronic noise floor at maximum usable gain.",
+      "closes_when": "Bulk-fluid return is below the electronic noise floor after the maximum legitimate coherent averaging, in the most favourable geometry, while the seeded-particle positive control at a known concentration is recovered in the same session with the same settings.",
+      "does_not_close": "Nothing about the other five mechanisms. A urine with no distributed scatter can still reflect at a boundary with a second fluid or at an opening lumen wall.",
+      "positive_control": "Seeded calibrated particles at a known concentration, same session, same settings",
+      "load_bearing_unknowns": "bsc_urine",
+      "detect_fraction_favourable": 0.0,
+      "rig": "Uniform fluid loop, gate inside the fluid. Simplest rig in the programme.",
+      "rig_rank": 1,
+      "decidable": true,
+      "informative": false,
+      "verdict": "The model predicts a null across the whole modelled range. Run it early and cheaply as a confirmation; a positive result would be a model failure worth understanding before anything else proceeds."
+    },
+    {
+      "key": "M2",
+      "name": "Urine-urine impedance gradient",
+      "favourable_config": "dSG = 0.016 (top of the declared band), stationary then moving mismatched interface, normal incidence, shallowest declared depth",
+      "decisive_measurement": "The product f * G(k, L_edge): the fraction of the impedance step in the leading edge times that edge's profile factor, reported as one quantity",
+      "predicted_if_live_db": "-200 / -78 / -14 (10/50/90 pct)",
+      "null_prediction": "Acoustically matched fluids in motion produce no stable feature attributable to a fluid-fluid gradient, only apparatus and wall residuals.",
+      "closes_when": "No gradient-attributable echo at dSG = 0.016 in the most favourable controlled geometry, with the stationary mismatched interface confirming in the same session that the chain can see a boundary at all.",
+      "does_not_close": "The lumen-opening and wall-motion mechanisms, which do not require any fluid-fluid contrast. Failure only at dSG = 0.002 closes nothing except the low-contrast corner and does NOT identify which VUR grades would be missed.",
+      "positive_control": "Stationary mismatched interface: proves the chain can see a boundary at all",
+      "load_bearing_unknowns": "dc_drho, sharp_fraction, edge_width",
+      "detect_fraction_favourable": 0.011933333333333334,
+      "rig": "Two-fluid loop with a controlled interface and concentration imaging.",
+      "rig_rank": 2,
+      "decidable": true,
+      "informative": false,
+      "verdict": "The model predicts a null across the whole modelled range. Run it early and cheaply as a confirmation; a positive result would be a model failure worth understanding before anything else proceeds."
+    },
+    {
+      "key": "M3",
+      "name": "Diffuse mixing / turbulence",
+      "favourable_config": "dSG = 0.016 at the highest flow rate the declared waveform produces, turbulent regime confirmed, aperture ladder at fixed angle",
+      "decisive_measurement": "The frequency exponent n of the return across the full band, plus the aperture-area scaling, both against the matched-fluid turbulent control",
+      "predicted_if_live_db": "-110 / -76 / -42 (10/50/90 pct)",
+      "null_prediction": "Angular response is broad and flat rather than peaked; return scales with aperture area; matched fluids in turbulent flow return nothing.",
+      "closes_when": "No return above the matched-fluid turbulent control across the whole dSG band at the flow rates the voiding waveform actually produces.",
+      "does_not_close": "The coherent mechanisms. A diffuse null is expected wherever the transition stays laminar, so a null here is a statement about the flow regime as much as about acoustics.",
+      "positive_control": "Seeded turbulent flow at a known scatterer concentration",
+      "load_bearing_unknowns": "mix_z_variance, mix_corr_length, dc_drho",
+      "detect_fraction_favourable": 0.0,
+      "rig": "Two-fluid loop plus flow control able to reach and confirm a turbulent regime.",
+      "rig_rank": 3,
+      "decidable": true,
+      "informative": false,
+      "verdict": "The model predicts a null across the whole modelled range. Run it early and cheaply as a confirmation; a positive result would be a model failure worth understanding before anything else proceeds."
+    },
+    {
+      "key": "M4",
+      "name": "Lumen opening",
+      "favourable_config": "Compliant collapsible channel driven through a full opening cycle against a wall-less channel control, identical flow, pressure and background",
+      "decisive_measurement": "Compliant-channel minus wall-less-channel RF difference, with optical lumen-area truth, as a function of opening separation h",
+      "predicted_if_live_db": "-15 / 7 / 19 (10/50/90 pct)",
+      "null_prediction": "A wall-less channel and a compliant collapsible channel, run under identical flow, pressure, acoustic and background conditions, return the same waveform.",
+      "closes_when": "A controlled collapsible tube driven through a full opening cycle produces no repeatable moving RF feature in the most favourable controlled geometry, with synchronised optical imaging confirming the lumen actually opened.",
+      "does_not_close": "How often a child's ureter is apposed when reflux begins. That prevalence is unmeasured and this mechanism is conditional on it. A positive result here is not evidence of a urine-urine interface.",
+      "positive_control": "Optical confirmation that the lumen actually opened during the trial",
+      "load_bearing_unknowns": "lumen_collapsed, z_wall",
+      "detect_fraction_favourable": 0.5215666666666666,
+      "rig": "Compliant collapsible channel against a wall-less control, with optical lumen truth.",
+      "rig_rank": 4,
+      "decidable": true,
+      "informative": true,
+      "verdict": "Informative: the modelled range straddles the threshold, so this experiment can genuinely go either way. This is where the uncertainty lives."
+    },
+    {
+      "key": "M5",
+      "name": "Ureter-wall motion",
+      "favourable_config": "Pressure-only compliant wall with synchronised optical wall-position truth, against rigid-body translation and pump-vibration controls",
+      "decisive_measurement": "Ratio of reflux-attributable wall displacement to nuisance displacement, i.e. the common-mode motion rejection actually achieved",
+      "predicted_if_live_db": "2 / 15 / 24 (10/50/90 pct)",
+      "null_prediction": "Under pressure-only actuation with no reflux, the wall echo still moves. The reflux-specific component is the ordered retrograde propagation of that motion, not its presence.",
+      "closes_when": "Retrograde wall-motion sequences cannot be separated from simulated antegrade peristalsis, fixture translation and pump vibration at the frozen decision threshold.",
+      "does_not_close": "The fluid mechanisms. Note also that this mechanism is the one most likely to succeed on the bench and fail clinically, because the bench has no breathing, no bladder contraction and no operator hand tremor.",
+      "positive_control": "Imposed, surveyed wall displacement of known amplitude and direction",
+      "load_bearing_unknowns": "z_wall",
+      "detect_fraction_favourable": 0.8245333333333333,
+      "rig": "Same compliant rig plus surveyed imposed motion and vibration controls.",
+      "rig_rank": 4,
+      "decidable": true,
+      "informative": true,
+      "verdict": "Informative: the modelled range straddles the threshold, so this experiment can genuinely go either way. This is where the uncertainty lives."
+    },
+    {
+      "key": "M6",
+      "name": "Composite wall-fluid change",
+      "favourable_config": "Not testable in isolation: runs only after M2 and M4 have each been measured separately with their own phase records",
+      "decisive_measurement": "The measured relative phase between the M2 and M4 contributions. Without it the composite is an interval, not a value",
+      "predicted_if_live_db": "-15 / 6 / 19 (10/50/90 pct)",
+      "null_prediction": "None available. A composite hypothesis makes no null prediction of its own, which is precisely why it must not be tested first.",
+      "closes_when": "Never on its own. This mechanism is closed only by the closure of every component, and it is opened only by evidence that two measured components co-occur with a stable phase relationship.",
+      "does_not_close": "Anything. The destructive corner of the composite interval is weaker than the strongest component alone, so a composite claim cannot rescue a failed component.",
+      "positive_control": "None exists. That is the reason it cannot be tested first",
+      "load_bearing_unknowns": "relative phase (entirely unconstrained)",
+      "detect_fraction_favourable": 0.5108,
+      "rig": "No rig of its own. Runs on stored records from M2 and M4.",
+      "rig_rank": 5,
+      "decidable": true,
+      "informative": true,
+      "verdict": "Informative: the modelled range straddles the threshold, so this experiment can genuinely go either way. This is where the uncertainty lives."
+    }
+  ],
+  "screening_order": [
+    "M1",
+    "M2",
+    "M3",
+    "M5",
+    "M4",
+    "M6"
+  ]
+}
