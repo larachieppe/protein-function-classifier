@@ -24,7 +24,10 @@ It tests two protocols:
 | **B** | *Thermal VCUG* | Bladder filled with saline a few K warmer or cooler than the body, then the patient voids | Temperature change in the renal pelvis |
 
 Run `python bioheat_reflux.py` (about 40 s, needs numpy/scipy/matplotlib). It writes the
-figures below and `results.json`.
+figures below, `results.json` and `thermal_reflux_tracer.html`, an interactive version of
+this write-up built from `page_template.html`.
+
+Shareable page: https://claude.ai/artifact/3itkJkM3wrfbf47kkctBza
 
 ## Why this can work: the dimensionless numbers
 
@@ -53,7 +56,7 @@ signal, not which way it points. Two more facts matter:
 - **Faster flow gives a weaker signal.** The heat is spread over more urine, so the bulk
   temperature rise scales roughly as ΔT ≈ P/(ρc·Q). With the gentle pulse (+2 K at the
   focus with no flow), the downstream voxel peaks at:
-  - 0.48 K at 0.13 cm/s
+  - 0.47 K at 0.13 cm/s
   - 0.12 K at 2 cm/s
   - 0.06 K at 5 cm/s
 
@@ -64,14 +67,14 @@ signal, not which way it points. Two more facts matter:
   | Pulse | Thermometry noise | Reliable range (≥ 90%) |
   |---|---|---|
   | +6 K | 0.2 K per frame | 0.13–1 cm/s; 78% at 2 cm/s, 34% at 5 cm/s |
-  | +6 K | 0.5 K per frame (typical MR thermometry) | Never reliable; at most about 75% |
+  | +6 K | 0.5 K per frame (typical MR thermometry) | Never reliable; at most about 86% (at 0.25 cm/s) |
 
   The +6 K pulse briefly brings tissue to about 43–45 °C. Its thermal dose is
   **CEM43 = 0.22 min**, compared with roughly 240 min for damage to muscle and fat.
   The gentle +2 K pulse gives 0.001 min.
 - **"Heat, then wait" works better than heating flowing urine** (figure below). Heating the
   urine while it is still, then letting the first reflux jet push the warm slug past the
-  sensor, gives a **0.58 K** spike on the kidney side only, even with the gentle pulse.
+  sensor, gives a **0.57 K** spike on the kidney side only, even with the gentle pulse.
   However, the spike lasts less than 1 s, so the readout needs a frame rate of about 5 Hz or
   faster.
 

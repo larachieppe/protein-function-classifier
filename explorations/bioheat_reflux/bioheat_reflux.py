@@ -37,6 +37,11 @@ import numpy as np
 from scipy.stats import norm
 
 OUT = Path(__file__).resolve().parent
+PAGE: dict = {}  # compact chart data inlined into thermal_reflux_tracer.html
+
+
+def _r(a, nd=4):
+    return [round(float(x), nd) for x in a]
 
 # ---------------------------------------------------------------- material values
 # Urine ~ water. Tissue ~ generic retroperitoneal soft tissue (muscle/fat mix).
@@ -104,13 +109,14 @@ def simulate(geo: Ureter, mean_velocity, t_end: float, z_range=(-40e-3, 40e-3),
     T = np.zeros((nr, nz))
     samples = {name: [] for name in (record or {})}
     times = []
-    sample_every = max(1, int(round(0.1 / dt)))
+    next_sample = 0.0
     peak_T = 0.0
     cem43 = np.zeros((nr, nz))  # thermal dose (equivalent minutes at 43 C), body at 37 C
 
     for n in range(n_steps + 1):
         t = n * dt
-        if record and n % sample_every == 0:
+        if record and t >= next_sample - 1e-9:
+            next_sample += 0.1
             times.append(t)
             for name, fn in record.items():
                 samples[name].append(fn(T, r, z))
@@ -217,6 +223,16 @@ def experiment_a(geo=Ureter()):
             detect[(g_name, s)] = row
 
     plot_a(runs, velocities_cm, detect, geo)
+    sub = slice(0, None, 2)  # 0.2 s
+    PAGE["A"] = dict(
+        t=_r(runs[0]["t"][sub], 2),
+        traces={str(v): {k_: _r(runs[v]["samples"][k_][sub]) for k_ in ("kidney", "bladder", "focus")}
+                for v in velocities_cm},
+        pulse={k_: _r(runs["pulse"]["samples"][k_][::1]) for k_ in ("kidney", "bladder", "focus")},
+        pulse_t=_r(runs["pulse"]["t"], 2),
+        velocities=velocities_cm,
+        detect={f"{g}|{s}": _r(row, 3) for (g, s), row in detect.items()},
+    )
     return dict(
         power_density_peak_W_per_cm3=float(Q.max() / 1e6),
         velocities_cm_s=velocities_cm,
@@ -401,6 +417,13 @@ def experiment_b():
     rad_needed = 3 * 0.1 * np.sqrt(2) / (gain * np.minimum(1, vols / 30))
 
     plot_b(transit, decay, vols, mr_needed, rad_needed)
+    PAGE["B"] = dict(
+        transit=[dict(label=k[0], v=k[1] * 100, t=_r(r_["t"][::2], 2), y=_r(r_["outlet"][::2], 3))
+                 for k, r_ in transit.items()],
+        decay=[dict(vol=v, radius=round(d["radius_mm"], 1), t=_r(d["t"][::2], 1), y=_r(d["mean"][::2], 3))
+               for v, d in decay.items()],
+        vols=_r(vols, 3), mr=_r(mr_needed, 3), rad=_r(rad_needed, 2),
+    )
     return dict(
         transit_retention={f"{k[0]} @ {k[1]*100:.0f} cm/s": v["retention"] for k, v in transit.items()},
         pelvis_mean_dT_at_15s_per_K={str(v): float(np.interp(15, d["t"], d["mean"])) for v, d in decay.items()},
@@ -472,4 +495,8 @@ if __name__ == "__main__":
     print("Experiment B …")
     results["B_thermal_vcug"] = experiment_b()
     (OUT / "results.json").write_text(json.dumps(results, indent=2))
+    template = OUT / "page_template.html"
+    if template.exists():  # shareable page with the chart data inlined
+        page = template.read_text().replace("__PAGE_DATA__", json.dumps(PAGE, separators=(",", ":")))
+        (OUT / "thermal_reflux_tracer.html").write_text(page)
     print("wrote", OUT / "results.json")

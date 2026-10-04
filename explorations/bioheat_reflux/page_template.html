@@ -1,0 +1,697 @@
+<title>Thermal Reflux Tracer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (~42rem) with figures that break wider (~64rem); a lab-notebook report, cool clinical neutrals, heat carried only by the data. */
+:root {
+  --bg: #f4f7f8;
+  --surface: #ffffff;
+  --ink: #111a1f;
+  --ink-2: #44525c;
+  --muted: #6f7d87;
+  --rule: #d9e1e5;
+  --grid: #e8eef1;
+  --accent: #0d6670;
+  --accent-wash: #e1eff0;
+  --s1: #2a78d6;           /* bladder-side / series 1 (blue) */
+  --s2: #eb6834;           /* kidney-side / series 2 (orange) */
+  --s-neutral: #8c979f;    /* heated-spot voxel */
+  --q1: #86b6ef; --q2: #3987e5; --q3: #1c5cab; --q4: #0d366b;  /* ordinal blue ramp */
+  --ok: #1f7a4d; --warn: #9a6400; --bad: #b3261e;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --read: 42rem;
+  --wide: 64rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1316; --surface: #151c20; --ink: #e7edf0; --ink-2: #aab5bc; --muted: #84919a;
+    --rule: #26313a; --grid: #1d262c; --accent: #5cb8c0; --accent-wash: #15292c;
+    --s1: #3987e5; --s2: #d95926; --s-neutral: #7f8a92;
+    --q1: #9ec5f4; --q2: #5598e7; --q3: #2a78d6; --q4: #1c5cab;
+    --ok: #4cc28a; --warn: #e0a53a; --bad: #f07067;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1316; --surface: #151c20; --ink: #e7edf0; --ink-2: #aab5bc; --muted: #84919a;
+  --rule: #26313a; --grid: #1d262c; --accent: #5cb8c0; --accent-wash: #15292c;
+  --s1: #3987e5; --s2: #d95926; --s-neutral: #7f8a92;
+  --q1: #9ec5f4; --q2: #5598e7; --q3: #2a78d6; --q4: #1c5cab;
+  --ok: #4cc28a; --warn: #e0a53a; --bad: #f07067;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 1.0625rem; line-height: 1.6;
+  padding-inline: 16px; padding-block: 0 4rem;
+}
+main { display: flex; flex-direction: column; gap: 3.5rem; }
+.read { max-width: var(--read); margin-inline: auto; width: 100%; }
+.wide { max-width: var(--wide); margin-inline: auto; width: 100%; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.12; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 5.5vw, 3.4rem); font-weight: 700; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 500; }
+p { margin: 0; }
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+.eyebrow {
+  font-family: var(--f-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+}
+.lede { font-size: 1.22rem; color: var(--ink-2); }
+.muted { color: var(--muted); }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, input:focus-visible, svg:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+.num { font-variant-numeric: tabular-nums; }
+
+header.top { padding-block: 3.5rem 0; }
+.badge {
+  display: inline-flex; align-items: center; gap: .4rem; align-self: flex-start;
+  font-family: var(--f-mono); font-size: .72rem; letter-spacing: .04em;
+  border: 1px solid var(--rule); border-radius: 999px; padding: .2rem .65rem; color: var(--ink-2); background: var(--surface);
+}
+.badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--warn); }
+
+/* ---------- flow dial (hero) ---------- */
+.dial {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 14px;
+  padding: clamp(1rem, 3vw, 1.75rem); display: flex; flex-direction: column; gap: 1.25rem;
+}
+.dial-head { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: flex-end; justify-content: space-between; }
+.dial-head > div { min-width: 0; }
+.readout { font-family: var(--f-display); font-size: clamp(1.25rem, 3vw, 1.6rem); font-weight: 500; }
+.readout .dir { font-weight: 700; }
+.readout .dir.reflux { color: var(--s2); }
+.readout .dir.ante { color: var(--s1); }
+.controls { display: flex; flex-wrap: wrap; gap: 1rem 1.75rem; align-items: center; }
+.slider-wrap { display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+.slider-wrap label, .seg-label { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.slider-ends { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: .72rem; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font: 500 .85rem var(--f-mono); padding: .45rem .8rem; border: 0; background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.dial-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 1.5rem; align-items: start; }
+@media (max-width: 760px) { .dial-grid { grid-template-columns: minmax(0, 1fr); } }
+.schematic svg { width: 100%; height: auto; display: block; }
+.caption { font-size: .9rem; color: var(--muted); }
+
+/* ---------- facts row ---------- */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.fact { background: var(--surface); padding: 1.1rem 1.2rem; display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.fact .v { font-family: var(--f-display); font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fact .k { font-size: .92rem; color: var(--ink-2); line-height: 1.4; }
+
+/* ---------- figures ---------- */
+figure { margin: 0; display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
+.fig-title { font-family: var(--f-display); font-weight: 500; font-size: 1rem; }
+.fig-grid { display: grid; gap: 2rem 1.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); }
+.fig-grid.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); }
+.chart { position: relative; width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart svg text { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+.chart svg .axis-label { fill: var(--ink-2); }
+.legend { display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-family: var(--f-mono); font-size: .75rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.legend svg { flex: none; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 2; min-width: 9rem;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: .5rem .65rem;
+  box-shadow: 0 6px 20px rgb(0 0 0 / .12); font-family: var(--f-mono); font-size: .75rem; color: var(--ink-2);
+  display: flex; flex-direction: column; gap: .2rem;
+}
+.tip[hidden] { display: none; }
+.tip .tx { color: var(--muted); }
+.tip .row { display: flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.tip .row b { color: var(--ink); font-weight: 600; min-width: 3.6rem; }
+
+/* ---------- tables, lists ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+td.n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: .3rem; font-family: var(--f-mono); font-size: .75rem; padding: .05rem .5rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+ul.plain { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: .5rem; }
+details { border-top: 1px solid var(--rule); padding-top: .6rem; }
+summary { cursor: pointer; font-family: var(--f-mono); font-size: .78rem; color: var(--ink-2); }
+details[open] summary { margin-bottom: .6rem; }
+
+.protocols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; }
+.protocol { border: 1px solid var(--rule); border-radius: 12px; padding: 1.1rem 1.2rem; background: var(--surface); display: flex; flex-direction: column; gap: .45rem; }
+.protocol .tag { font-family: var(--f-mono); font-size: .72rem; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; }
+.verdict { border-left: 3px solid var(--accent); padding-left: 1.1rem; }
+.eq { font-family: var(--f-mono); font-size: .88rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: .75rem 1rem; overflow-x: auto; white-space: nowrap; }
+footer { border-top: 1px solid var(--rule); padding-top: 1.25rem; font-size: .9rem; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .plume { transition: opacity .35s ease; }
+}
+</style>
+
+<main>
+  <header class="top read stack">
+    <span class="badge">Exploratory model · not clinically validated</span>
+    <span class="eyebrow">Bioheat · vesicoureteral reflux</span>
+    <h1>Can a pulse of heat show which way urine flows?</h1>
+    <p class="lede">In vesicoureteral reflux (VUR), urine runs backwards from the bladder up the ureter towards the kidney. Today it is diagnosed with X-ray contrast (VCUG) or ultrasound microbubbles (ceVUS). This model asks whether a small temperature tracer could show the direction of flow instead, with no radiation and no contrast agent.</p>
+  </header>
+
+  <!-- Flow dial -->
+  <section class="wide" aria-labelledby="dial-h">
+    <div class="dial">
+      <div class="dial-head">
+        <div class="stack" style="gap:.35rem">
+          <span class="eyebrow" id="dial-h">Flow dial · protocol A</span>
+          <p class="readout" id="readout" aria-live="polite">–</p>
+        </div>
+        <div class="controls">
+          <div class="stack" style="gap:.35rem">
+            <span class="seg-label" id="gain-label">Heating pulse</span>
+            <div class="seg" role="group" aria-labelledby="gain-label">
+              <button type="button" id="gain-2" aria-pressed="true">+2 K</button>
+              <button type="button" id="gain-6" aria-pressed="false">+6 K</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slider-wrap">
+        <label for="vel">Mean urine velocity</label>
+        <input type="range" id="vel" min="0" max="14" step="1" value="12">
+        <div class="slider-ends"><span>← 5 cm/s antegrade</span><span>no flow</span><span>reflux 5 cm/s →</span></div>
+      </div>
+      <div class="dial-grid">
+        <div class="schematic stack" style="gap:.5rem">
+          <div id="schematic" role="img" aria-label="Ureter schematic showing the heated spot and the two thermometry voxels"></div>
+          <p class="caption">A 2 mm-radius ureter in perfused tissue. A focused-ultrasound spot heats the centre for 5 s. Thermometry voxels sit 10 mm either side.</p>
+        </div>
+        <figure>
+          <div class="legend" id="dial-legend"></div>
+          <div class="chart" id="dial-chart"></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="wide" aria-label="Key numbers">
+    <div class="facts">
+      <div class="fact"><span class="v num">90 – 3,500</span><span class="k">Péclet number over 10 mm. Moving urine carries heat far further than it diffuses.</span></div>
+      <div class="fact"><span class="v num">0.004 K</span><span class="k">Rise 10 mm away with no flow. Without flow, the sensors stay flat.</span></div>
+      <div class="fact"><span class="v num">0.22 min</span><span class="k">Thermal dose (CEM43) of the stronger +6 K pulse, against ~240 min for tissue damage.</span></div>
+      <div class="fact"><span class="v num">0.3 – 1.4 K</span><span class="k">Bladder-fill offset MR thermometry needs to see 5 to 0.5 mL of reflux.</span></div>
+    </div>
+  </section>
+
+  <section class="read stack">
+    <span class="eyebrow">The model</span>
+    <h2>Two ways to use heat as a tracer</h2>
+    <p>The script couples the Pennes bioheat equation in tissue to heat carried by urine in the ureter lumen, solved on an axisymmetric finite-volume grid. Temperatures are rises above core temperature (37 °C).</p>
+    <div class="eq">ρc (∂T/∂t + u·∇T) = ∇·(k∇T) + ω<sub>b</sub>ρ<sub>b</sub>c<sub>b</sub>(T<sub>a</sub> − T) + Q</div>
+  </section>
+  <section class="wide protocols">
+    <div class="protocol"><span class="tag">Protocol A · time-of-flight</span><h3>Heat a spot, watch both sides</h3><p>Heat a 1.5 mm spot on the ureter for 5 s, for example with focused ultrasound. Read one thermometry voxel 10 mm towards the kidney and one 10 mm towards the bladder. The side that warms is downstream.</p></div>
+    <div class="protocol"><span class="tag">Protocol B · thermal VCUG</span><h3>Fill the bladder off-temperature</h3><p>Fill the bladder with saline a few kelvin warmer or cooler than the body, as a VCUG already does with contrast. If urine refluxes during voiding, the temperature anomaly reaches the renal pelvis, where MR thermometry or microwave radiometry can look for it.</p></div>
+  </section>
+
+  <section class="read stack">
+    <span class="eyebrow">Why it can work</span>
+    <h2>Flow beats diffusion by orders of magnitude</h2>
+    <p>The Péclet number compares heat carried by flow with heat that spreads by conduction. Above 1, flow wins. In the ureter it is far above 1 in every regime, so the direction of the warm plume reports the direction of flow almost perfectly. The open question is signal size, not direction.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Flow regime</th><th>Velocity</th><th>Péclet (10 mm)</th><th>Transit ÷ radial diffusion time</th></tr></thead>
+        <tbody>
+          <tr><td>Mean urine production (1 mL/min)</td><td class="n">0.13 cm/s</td><td class="n">~90</td><td class="n">1.6</td></tr>
+          <tr><td>Peristaltic bolus</td><td class="n">2.5 cm/s</td><td class="n">~1,700</td><td class="n">0.08</td></tr>
+          <tr><td>Voiding reflux jet</td><td class="n">5 cm/s</td><td class="n">~3,500</td><td class="n">0.04</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Heat leaks from urine into the ureter wall in about 5 s. Perfusion clears tissue heat over about 18 min, so it hardly matters on these timescales.</p>
+  </section>
+
+  <section class="wide stack" style="gap:1.5rem">
+    <div class="read stack" style="margin-inline:0">
+      <span class="eyebrow">Protocol A · results</span>
+      <h2>Direction is clean. Faster flow gives a weaker signal.</h2>
+      <p>The heat is spread over more urine as flow speeds up, so the downstream rise falls roughly as P/(ρc·Q). Flow also cools the heated spot, which is itself a flow meter but does not give direction.</p>
+    </div>
+    <div class="fig-grid two">
+      <figure>
+        <figcaption class="fig-title">Peak rise at each voxel, +2 K pulse</figcaption>
+        <div class="legend" id="wash-legend"></div>
+        <div class="chart" id="wash-chart"></div>
+        <p class="caption">Negative velocity is normal antegrade flow; positive is reflux. The upstream voxel stays below 0.0001 K at every speed.</p>
+      </figure>
+      <figure>
+        <figcaption class="fig-title">Chance of calling the direction correctly</figcaption>
+        <div class="legend" id="det-legend"></div>
+        <div class="chart" id="det-chart"></div>
+        <p class="caption">7 frames at 1 Hz, one-sided test at 5% false positives. Reflux shown; antegrade is symmetric.</p>
+      </figure>
+    </div>
+    <details class="read" style="margin-inline:0">
+      <summary>Detection probabilities as a table</summary>
+      <div class="table-wrap"><table id="det-table"></table></div>
+    </details>
+  </section>
+
+  <section class="wide stack" style="gap:1.5rem">
+    <div class="read stack" style="margin-inline:0">
+      <span class="eyebrow">Protocol A · variant</span>
+      <h2>Heat the still urine first, then wait for the jet</h2>
+      <p>Heating urine that is already moving spreads the heat thin. If the spot is heated while the urine is still, the first reflux jet pushes the whole warm slug past the kidney-side voxel. With only the gentle pulse, that gives a 0.57 K spike on the kidney side and nothing on the bladder side. The spike lasts under a second, so the readout has to sample at about 5 Hz or faster.</p>
+    </div>
+    <figure>
+      <figcaption class="fig-title">2 s reflux jet at 3 cm/s (≈0.75 mL), arriving at t = 4 s</figcaption>
+      <div class="legend" id="pulse-legend"></div>
+      <div class="chart" id="pulse-chart"></div>
+    </figure>
+  </section>
+
+  <section class="wide stack" style="gap:1.5rem">
+    <div class="read stack" style="margin-inline:0">
+      <span class="eyebrow">Protocol B · results</span>
+      <h2>A thermal VCUG is within reach of MR thermometry</h2>
+      <p>Urine climbing a 12 cm (paediatric) ureter keeps most of its temperature offset. Dilated ureters, which go with worse reflux, keep more. Once pooled in the renal pelvis, the anomaly lasts tens of seconds, which is plenty of time to image.</p>
+    </div>
+    <div class="fig-grid">
+      <figure>
+        <figcaption class="fig-title">Offset arriving at the pelvis</figcaption>
+        <div class="legend" id="tr-legend"></div>
+        <div class="chart" id="tr-chart"></div>
+        <p class="caption">Fraction of the bladder's offset in urine reaching the top of the ureter.</p>
+      </figure>
+      <figure>
+        <figcaption class="fig-title">Decay of pooled refluxed urine</figcaption>
+        <div class="legend" id="dc-legend"></div>
+        <div class="chart" id="dc-chart"></div>
+        <p class="caption">Mean offset of a pool in renal-sinus tissue, as a fraction of its starting value.</p>
+      </figure>
+      <figure>
+        <figcaption class="fig-title">Bladder offset needed for 3σ detection</figcaption>
+        <div class="legend" id="nd-legend"></div>
+        <div class="chart" id="nd-chart"></div>
+        <p class="caption">Read 15 s after reflux. Log scale. The shaded band is a comfortable ±4 K fill.</p>
+      </figure>
+    </div>
+    <div class="read stack" style="margin-inline:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Refluxed volume</th><th>MR thermometry<br>0.5 K per voxel</th><th>Microwave radiometry<br>0.1 K, ~30 mL view</th></tr></thead>
+          <tbody>
+            <tr><td class="n">0.5 mL</td><td class="n">1.4 K <span class="pill ok">✓ feasible</span></td><td class="n">~70 K <span class="pill bad">✕ no</span></td></tr>
+            <tr><td class="n">1 mL</td><td class="n">0.8 K <span class="pill ok">✓ feasible</span></td><td class="n">~29 K <span class="pill bad">✕ no</span></td></tr>
+            <tr><td class="n">2 mL</td><td class="n">0.5 K <span class="pill ok">✓ feasible</span></td><td class="n">~13 K <span class="pill bad">✕ no</span></td></tr>
+            <tr><td class="n">5 mL</td><td class="n">0.3 K <span class="pill ok">✓ feasible</span></td><td class="n">~4.7 K <span class="pill warn">△ marginal</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A cool fill (30–33 °C) is the attractive option: it adds no heat at all. Radiometry fails because its field of view is far larger than the reflux, so the signal is diluted.</p>
+    </div>
+  </section>
+
+  <section class="read stack">
+    <span class="eyebrow">Verdict</span>
+    <h2>The physics works. Measuring the temperature is the hard part.</h2>
+    <div class="verdict stack">
+      <p><strong>Heat gives an unambiguous direction signal</strong>, and the doses needed are far inside safe limits.</p>
+      <p><strong>Protocol B with MR thermometry looks most practical:</strong> a contrast-free MR voiding cystography that only needs a bladder fill a few degrees off body temperature.</p>
+      <p><strong>Protocol A suits catheter or intra-operative use</strong>, where a thermistor or fibre-optic sensor with about 0.05 K noise makes the 0.1–0.5 K plume decisive.</p>
+    </div>
+    <h3>What the model leaves out</h3>
+    <ul class="plain">
+      <li><strong>Motion during voiding</strong> corrupts MR (PRF-shift) thermometry. This is probably the biggest practical problem.</li>
+      <li><strong>The ureter is not a steady tube.</strong> It collapses between peristaltic boluses, and a collapsed lumen carries no heat.</li>
+      <li><strong>Fat gives no PRF thermometry signal</strong>, and the renal sinus is fatty.</li>
+      <li><strong>Kidney cortex perfusion</strong> is about 100× the tissue value used here. It matters only if refluxed urine sits against the parenchyma.</li>
+      <li><strong>Contrast ultrasound already avoids radiation.</strong> A thermal method would compete on needing no agent at all and on estimating volume.</li>
+    </ul>
+    <h3>Next steps</h3>
+    <ul class="plain">
+      <li>Replace steady Poiseuille flow with travelling peristaltic boluses fitted to published data.</li>
+      <li>Simulate the full chain, from bladder heat loss during filling to a renal pelvis segmented from real MR or CT.</li>
+      <li>Model ultrasound echo-shift thermometry for a bedside, ceVUS-like workflow.</li>
+      <li>Build a bench phantom: a silicone tube in a perfused tissue mimic, a reversible syringe pump and a fibre-optic readout.</li>
+    </ul>
+  </section>
+
+  <footer class="read stack" style="gap:.5rem">
+    <p>Model and data: <code>explorations/bioheat_reflux/bioheat_reflux.py</code> in <a href="https://github.com/larachieppe/protein-function-classifier/tree/claude/charming-thompson-9yx6zq/explorations/bioheat_reflux">larachieppe/protein-function-classifier</a>. Tissue properties are literature-typical values, and no result here has been checked against measurements.</p>
+  </footer>
+</main>
+
+<script id="page-data" type="application/json">__PAGE_DATA__</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById("page-data").textContent);
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+  const fmt = (v, d = 2) => (Math.abs(v) < 0.005 && v !== 0 ? v.toExponential(0) : v.toFixed(d));
+
+  function legend(host, series) {
+    host.replaceChildren();
+    for (const s of series) {
+      const span = document.createElement("span");
+      const k = el("svg", { width: 18, height: 8, "aria-hidden": "true" });
+      el("line", { x1: 1, y1: 4, x2: 17, y2: 4, style: `stroke:${s.color};stroke-width:2.5;stroke-linecap:round${s.dash ? ";stroke-dasharray:" + s.dash : ""}` }, k);
+      span.appendChild(k);
+      span.appendChild(document.createTextNode(s.name));
+      host.appendChild(span);
+    }
+  }
+
+  // Minimal SVG line chart with crosshair tooltip and keyboard stepping.
+  function lineChart(host, cfg) {
+    const state = { cfg };
+    const tip = document.createElement("div");
+    tip.className = "tip"; tip.hidden = true;
+    function scale(ax, px0, px1) {
+      const f = ax.log ? Math.log10 : (v) => v;
+      const a = f(ax.min), b = f(ax.max);
+      return (v) => px0 + ((f(v) - a) / (b - a)) * (px1 - px0);
+    }
+    function draw() {
+      const c = state.cfg;
+      const W = Math.max(260, host.clientWidth);
+      const H = c.height || Math.round(Math.min(320, Math.max(220, W * 0.55)));
+      const m = { l: 48, r: 14, t: 10, b: 42 };
+      host.replaceChildren();
+      const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, tabindex: 0, role: "img", "aria-label": c.aria || "" }, host);
+      const X = scale(c.x, m.l, W - m.r), Y = scale(c.y, H - m.b, m.t);
+      for (const b of c.bands || []) {
+        const x0 = b.x0 != null ? X(b.x0) : m.l, x1 = b.x1 != null ? X(b.x1) : W - m.r;
+        const y0 = b.y0 != null ? Y(b.y0) : H - m.b, y1 = b.y1 != null ? Y(b.y1) : m.t;
+        el("rect", { x: Math.min(x0, x1), y: Math.min(y0, y1), width: Math.abs(x1 - x0), height: Math.abs(y1 - y0), style: `fill:${b.fill};opacity:${b.opacity ?? 0.14}` }, svg);
+        if (b.label) { const t = el("text", { x: Math.min(x0, x1) + 4, y: Math.min(y0, y1) + 12 }, svg); t.textContent = b.label; }
+      }
+      for (const v of c.y.ticks) {
+        el("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), style: "stroke:var(--grid);stroke-width:1" }, svg);
+        const t = el("text", { x: m.l - 6, y: Y(v) + 3.5, "text-anchor": "end" }, svg);
+        t.textContent = (c.y.fmt || String)(v);
+      }
+      for (const v of c.x.ticks) {
+        const t = el("text", { x: X(v), y: H - m.b + 15, "text-anchor": "middle" }, svg);
+        t.textContent = (c.x.fmt || String)(v);
+      }
+      el("line", { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, style: "stroke:var(--rule);stroke-width:1" }, svg);
+      for (const v of c.vlines || []) el("line", { x1: X(v), x2: X(v), y1: m.t, y2: H - m.b, style: "stroke:var(--rule);stroke-width:1" }, svg);
+      for (const h of c.hlines || []) el("line", { x1: m.l, x2: W - m.r, y1: Y(h), y2: Y(h), style: "stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3" }, svg);
+      const xl = el("text", { x: (m.l + W - m.r) / 2, y: H - 6, "text-anchor": "middle", class: "axis-label" }, svg); xl.textContent = c.x.label;
+      const yl = el("text", { x: 12, y: (m.t + H - m.b) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(m.t + H - m.b) / 2})`, class: "axis-label" }, svg); yl.textContent = c.y.label;
+      for (const s of c.series) {
+        let d = "", pen = false;
+        s.xs.forEach((x, i) => {
+          const y = s.ys[i];
+          const ok = Number.isFinite(y) && (!c.y.log || y > 0) && (!c.x.log || x > 0);
+          if (!ok) { pen = false; return; }
+          const yc = Math.min(Math.max(y, c.y.min), c.y.max);
+          d += `${pen ? "L" : "M"}${X(x).toFixed(1)},${Y(yc).toFixed(1)}`;
+          pen = true;
+        });
+        el("path", { d, style: `fill:none;stroke:${s.color};stroke-width:${s.w || 2};stroke-linejoin:round;stroke-linecap:round${s.dash ? ";stroke-dasharray:" + s.dash : ""}` }, svg);
+        if (s.markers) s.xs.forEach((x, i) => {
+          const y = s.ys[i];
+          if (!Number.isFinite(y) || (c.y.log && y <= 0)) return;
+          el("circle", { cx: X(x), cy: Y(Math.min(Math.max(y, c.y.min), c.y.max)), r: 3.5, style: `fill:${s.color};stroke:var(--surface);stroke-width:2` }, svg);
+        });
+      }
+      // hover layer
+      const cross = el("line", { y1: m.t, y2: H - m.b, style: "stroke:var(--ink-2);stroke-width:1;opacity:0" }, svg);
+      const dots = c.series.map((s) => el("circle", { r: 4, style: `fill:${s.color};stroke:var(--surface);stroke-width:2;opacity:0` }, svg));
+      const ref = c.series[0].xs;
+      const nearest = (xs, xv) => {
+        let lo = 0, hi = xs.length - 1;
+        while (hi - lo > 1) { const mid = (lo + hi) >> 1; (xs[mid] < xv ? (lo = mid) : (hi = mid)); }
+        return Math.abs(xs[lo] - xv) <= Math.abs(xs[hi] - xv) ? lo : hi;
+      };
+      const invert = (px) => {
+        const f = c.x.log ? Math.log10 : (v) => v, a = f(c.x.min), b = f(c.x.max);
+        const v = a + ((px - m.l) / (W - m.l - m.r)) * (b - a);
+        return c.x.log ? 10 ** v : v;
+      };
+      state.idx = state.idx ?? null;
+      function show(i) {
+        state.idx = i;
+        const xv = ref[i];
+        cross.setAttribute("x1", X(xv)); cross.setAttribute("x2", X(xv)); cross.style.opacity = 0.5;
+        tip.replaceChildren();
+        const hx = document.createElement("div"); hx.className = "tx";
+        hx.textContent = (c.x.tipFmt || c.x.fmt || String)(xv); tip.appendChild(hx);
+        c.series.forEach((s, k) => {
+          const j = nearest(s.xs, xv), y = s.ys[j];
+          const okY = Number.isFinite(y) && (!c.y.log || y > 0);
+          dots[k].style.opacity = okY ? 1 : 0;
+          if (okY) { dots[k].setAttribute("cx", X(s.xs[j])); dots[k].setAttribute("cy", Y(Math.min(Math.max(y, c.y.min), c.y.max))); }
+          const row = document.createElement("div"); row.className = "row";
+          const key = el("svg", { width: 14, height: 6 });
+          el("line", { x1: 1, y1: 3, x2: 13, y2: 3, style: `stroke:${s.color};stroke-width:2.5${s.dash ? ";stroke-dasharray:" + s.dash : ""}` }, key);
+          const b = document.createElement("b"); b.textContent = okY ? (c.y.tipFmt || fmt)(y) : "–";
+          const nm = document.createElement("span"); nm.textContent = s.name;
+          row.append(key, b, nm); tip.appendChild(row);
+        });
+        tip.hidden = false;
+        const px = X(xv), tw = tip.offsetWidth;
+        tip.style.left = `${px + 12 + tw > W ? px - tw - 12 : px + 12}px`;
+        tip.style.top = `${m.t}px`;
+      }
+      function hide() { tip.hidden = true; cross.style.opacity = 0; dots.forEach((d) => (d.style.opacity = 0)); }
+      svg.addEventListener("pointermove", (e) => {
+        const r = svg.getBoundingClientRect();
+        const px = ((e.clientX - r.left) / r.width) * W;
+        if (px < m.l || px > W - m.r) return hide();
+        show(nearest(ref, invert(px)));
+      });
+      svg.addEventListener("pointerleave", hide);
+      svg.addEventListener("blur", hide);
+      svg.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        const step = Math.max(1, Math.round(ref.length / 40));
+        const i = state.idx == null ? 0 : state.idx + (e.key === "ArrowRight" ? step : -step);
+        show(Math.max(0, Math.min(ref.length - 1, i)));
+      });
+      host.appendChild(tip);
+    }
+    let w = 0;
+    new ResizeObserver(() => { if (host.clientWidth !== w) { w = host.clientWidth; draw(); } }).observe(host);
+    draw();
+    return { update(next) { state.cfg = next; state.idx = null; draw(); } };
+  }
+
+  // ---------------- flow dial ----------------
+  const A = D.A, vels = A.velocities;
+  const S_K = { name: "kidney-side voxel", color: "var(--s2)" };
+  const S_B = { name: "bladder-side voxel", color: "var(--s1)" };
+  const S_F = { name: "heated spot", color: "var(--s-neutral)", dash: "4 3", w: 1.5 };
+  let gain = 1;
+  const velIn = document.getElementById("vel");
+  legend(document.getElementById("dial-legend"), [S_K, S_B, S_F]);
+
+  function dialCfg() {
+    const v = vels[+velIn.value], tr = A.traces[String(v)];
+    const sc = (a) => a.map((y) => y * gain);
+    // fit the axis to this velocity's traces so small downstream signals stay readable
+    const peak = Math.max(...tr.kidney, ...tr.bladder, ...tr.focus) * gain;
+    const steps = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8];
+    const top = steps.find((s) => s >= peak * 1.08) || 9;
+    const tick = top <= 0.5 ? 0.1 : top <= 1 ? 0.25 : top <= 2 ? 0.5 : top <= 4 ? 1 : 2;
+    const yt = []; for (let y = 0; y <= top + 1e-9; y += tick) yt.push(+y.toFixed(2));
+    return {
+      aria: `Temperature traces at ${v} cm/s`,
+      x: { min: 0, max: 30, ticks: [0, 5, 10, 15, 20, 25, 30], label: "time (s)", tipFmt: (t) => `t = ${t.toFixed(1)} s` },
+      y: { min: 0, max: top, ticks: yt, label: "ΔT (K)", fmt: (y) => y.toString(), tipFmt: (y) => `${y.toFixed(3)} K` },
+      bands: [{ x0: 0, x1: 5, fill: "var(--s2)", opacity: 0.08, label: "heating" }],
+      series: [
+        { ...S_K, xs: A.t, ys: sc(tr.kidney) },
+        { ...S_B, xs: A.t, ys: sc(tr.bladder) },
+        { ...S_F, xs: A.t, ys: sc(tr.focus) },
+      ],
+    };
+  }
+  const dialChart = lineChart(document.getElementById("dial-chart"), dialCfg());
+
+  function schematic() {
+    const v = vels[+velIn.value], tr = A.traces[String(v)];
+    const kMax = Math.max(...tr.kidney) * gain, bMax = Math.max(...tr.bladder) * gain;
+    const host = document.getElementById("schematic");
+    host.replaceChildren();
+    const W = 440, H = 190, cy = 96, x0 = 30, x1 = 410, cx = 220, off = 95; // 10 mm = 95 px
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, "aria-hidden": "true" }, host);
+    const defs = el("defs", {}, svg);
+    const dirSign = v > 0 ? 1 : v < 0 ? -1 : 0;
+    const g = el("linearGradient", { id: "plume", x1: dirSign >= 0 ? 0 : 1, x2: dirSign >= 0 ? 1 : 0, y1: 0, y2: 0 }, defs);
+    el("stop", { offset: "0%", style: "stop-color:var(--s2);stop-opacity:.85" }, g);
+    el("stop", { offset: "100%", style: "stop-color:var(--s2);stop-opacity:0" }, g);
+    const rg = el("radialGradient", { id: "spot" }, defs);
+    el("stop", { offset: "0%", style: "stop-color:var(--s2);stop-opacity:.9" }, rg);
+    el("stop", { offset: "100%", style: "stop-color:var(--s2);stop-opacity:0" }, rg);
+    // tissue band and ureter
+    el("rect", { x: x0, y: cy - 46, width: x1 - x0, height: 92, rx: 10, style: "fill:var(--bg);stroke:var(--rule)" }, svg);
+    el("rect", { x: x0, y: cy - 20, width: x1 - x0, height: 40, rx: 20, style: "fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2" }, svg);
+    // plume
+    const strength = Math.min(1, Math.max(kMax, bMax) / (0.5 * gain) + 0.15);
+    if (dirSign !== 0) {
+      const len = 150 + 30 * Math.min(1, Math.abs(v) / 2);
+      const px = dirSign > 0 ? cx : cx - len;
+      el("rect", { class: "plume", x: px, y: cy - 16, width: len, height: 32, rx: 16, fill: "url(#plume)", style: `opacity:${strength}` }, svg);
+    }
+    el("circle", { cx, cy, r: dirSign === 0 ? 30 : 20, fill: "url(#spot)" }, svg);
+    // voxels
+    for (const [x, side, val] of [[cx - off, "bladder-side", bMax], [cx + off, "kidney-side", kMax]]) {
+      const hot = val > 0.02;
+      el("rect", { x: x - 11, y: cy - 11, width: 22, height: 22, rx: 3, style: `fill:none;stroke:${side === "kidney-side" ? "var(--s2)" : "var(--s1)"};stroke-width:${hot ? 2.5 : 1.5}` }, svg);
+      const t = el("text", { x, y: cy + 62, "text-anchor": "middle", style: "font:600 12px var(--f-mono);fill:var(--ink)" }, svg);
+      t.textContent = `+${val < 0.001 ? "0.000" : val.toFixed(3)} K`;
+      const t2 = el("text", { x, y: cy + 77, "text-anchor": "middle", style: "font:11px var(--f-mono);fill:var(--muted)" }, svg);
+      t2.textContent = side;
+    }
+    // ends
+    const lb = el("text", { x: x0, y: 22, style: "font:600 12px var(--f-mono);fill:var(--s1)" }, svg); lb.textContent = "← bladder";
+    const lk = el("text", { x: x1, y: 22, "text-anchor": "end", style: "font:600 12px var(--f-mono);fill:var(--s2)" }, svg); lk.textContent = "kidney →";
+    // flow arrow
+    if (dirSign !== 0) {
+      const ay = 36, ax0 = dirSign > 0 ? cx - 50 : cx + 50, ax1 = dirSign > 0 ? cx + 50 : cx - 50;
+      el("line", { x1: ax0, y1: ay, x2: ax1, y2: ay, style: "stroke:var(--ink);stroke-width:1.5" }, svg);
+      el("path", { d: `M${ax1},${ay} l${-8 * dirSign},-4 l0,8 z`, style: "fill:var(--ink)" }, svg);
+      const ft = el("text", { x: cx, y: ay - 7, "text-anchor": "middle", style: "font:11px var(--f-mono);fill:var(--ink-2)" }, svg);
+      ft.textContent = `urine ${Math.abs(v)} cm/s`;
+    } else {
+      const ft = el("text", { x: cx, y: 36, "text-anchor": "middle", style: "font:11px var(--f-mono);fill:var(--ink-2)" }, svg);
+      ft.textContent = "urine still";
+    }
+  }
+
+  function readout() {
+    const v = vels[+velIn.value];
+    const r = document.getElementById("readout");
+    r.replaceChildren();
+    const dir = document.createElement("span");
+    dir.className = "dir " + (v > 0 ? "reflux" : v < 0 ? "ante" : "");
+    dir.textContent = v > 0 ? "Reflux" : v < 0 ? "Antegrade" : "No flow";
+    r.appendChild(dir);
+    r.appendChild(document.createTextNode(
+      v === 0 ? " · neither voxel warms" : ` · ${Math.abs(v)} cm/s · only the ${v > 0 ? "kidney" : "bladder"}-side voxel warms`));
+    velIn.setAttribute("aria-valuetext", `${v} centimetres per second, ${dir.textContent}`);
+  }
+  function updateDial() { readout(); schematic(); dialChart.update(dialCfg()); }
+  velIn.addEventListener("input", updateDial);
+  for (const [id, g] of [["gain-2", 1], ["gain-6", 3]]) {
+    document.getElementById(id).addEventListener("click", () => {
+      gain = g;
+      document.getElementById("gain-2").setAttribute("aria-pressed", String(g === 1));
+      document.getElementById("gain-6").setAttribute("aria-pressed", String(g === 3));
+      updateDial();
+    });
+  }
+  updateDial();
+
+  // ---------------- wash-out ----------------
+  const peaks = (key) => vels.map((v) => Math.max(...A.traces[String(v)][key]));
+  const washS = [
+    { ...S_K, name: "kidney-side voxel", xs: vels, ys: peaks("kidney"), markers: true },
+    { ...S_B, name: "bladder-side voxel", xs: vels, ys: peaks("bladder"), markers: true },
+    { ...S_F, name: "heated-spot voxel", xs: vels, ys: peaks("focus"), markers: true },
+  ];
+  legend(document.getElementById("wash-legend"), washS);
+  lineChart(document.getElementById("wash-chart"), {
+    aria: "Peak temperature rise against urine velocity",
+    x: { min: -5, max: 5, ticks: [-5, -3, -1, 0, 1, 3, 5], label: "velocity (cm/s): − antegrade, + reflux", tipFmt: (v) => `${v} cm/s` },
+    y: { min: 0, max: 2.1, ticks: [0, 0.5, 1, 1.5, 2], label: "peak ΔT (K)", tipFmt: (y) => `${y.toFixed(3)} K` },
+    vlines: [0], series: washS,
+  });
+
+  // ---------------- detection ----------------
+  const pos = vels.map((v, i) => [v, i]).filter(([v]) => v > 0);
+  const detS = [
+    { key: "6K|0.2", name: "+6 K pulse, σ 0.2 K", color: "var(--s1)" },
+    { key: "6K|0.5", name: "+6 K pulse, σ 0.5 K", color: "var(--s2)" },
+    { key: "2K|0.2", name: "+2 K pulse, σ 0.2 K", color: "var(--s1)", dash: "5 4" },
+    { key: "2K|0.5", name: "+2 K pulse, σ 0.5 K", color: "var(--s2)", dash: "5 4" },
+  ].map((s) => ({ ...s, xs: pos.map(([v]) => v), ys: pos.map(([, i]) => A.detect[s.key][i]), markers: true }));
+  legend(document.getElementById("det-legend"), detS);
+  lineChart(document.getElementById("det-chart"), {
+    aria: "Probability of a correct direction call against velocity",
+    x: { min: 0.1, max: 6, log: true, ticks: [0.13, 0.25, 0.5, 1, 2, 5], label: "reflux velocity (cm/s, log)", tipFmt: (v) => `${v} cm/s` },
+    y: { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1], label: "P(correct)", fmt: (y) => `${Math.round(y * 100)}%`, tipFmt: (y) => `${Math.round(y * 100)}%` },
+    hlines: [0.9], series: detS,
+  });
+  const tbl = document.getElementById("det-table");
+  const thead = tbl.createTHead().insertRow();
+  ["Velocity", ...detS.map((s) => s.name)].forEach((h) => { const th = document.createElement("th"); th.textContent = h; thead.appendChild(th); });
+  const tb = tbl.createTBody();
+  pos.forEach(([v, i]) => {
+    const r = tb.insertRow();
+    const c0 = r.insertCell(); c0.className = "n"; c0.textContent = `${v} cm/s`;
+    detS.forEach((s) => { const c = r.insertCell(); c.className = "n"; c.textContent = `${Math.round(A.detect[s.key][i] * 100)}%`; });
+  });
+
+  // ---------------- pulse ----------------
+  const pS = [
+    { ...S_K, xs: A.pulse_t, ys: A.pulse.kidney },
+    { ...S_B, xs: A.pulse_t, ys: A.pulse.bladder },
+    { ...S_F, xs: A.pulse_t, ys: A.pulse.focus },
+  ];
+  legend(document.getElementById("pulse-legend"), pS);
+  lineChart(document.getElementById("pulse-chart"), {
+    aria: "Temperature traces for a transient reflux jet",
+    height: 260,
+    x: { min: 0, max: 30, ticks: [0, 5, 10, 15, 20, 25, 30], label: "time (s)", tipFmt: (t) => `t = ${t.toFixed(1)} s` },
+    y: { min: 0, max: 1.8, ticks: [0, 0.5, 1, 1.5], label: "ΔT (K)", tipFmt: (y) => `${y.toFixed(3)} K` },
+    bands: [{ x0: 0, x1: 4, fill: "var(--s2)", opacity: 0.07, label: "heating" }, { x0: 4, x1: 6, fill: "var(--accent)", opacity: 0.14, label: "jet" }],
+    series: pS,
+  });
+
+  // ---------------- protocol B ----------------
+  const B = D.B;
+  const trS = B.transit.map((r) => ({
+    name: `${r.label.startsWith("dilated") ? "dilated 4 mm" : "normal 2 mm"}, ${r.v} cm/s`,
+    color: r.label.startsWith("dilated") ? "var(--s2)" : "var(--s1)", dash: r.v < 3 ? "5 4" : "",
+    xs: r.t, ys: r.y,
+  }));
+  legend(document.getElementById("tr-legend"), trS);
+  lineChart(document.getElementById("tr-chart"), {
+    aria: "Fraction of bladder offset arriving at the renal pelvis",
+    x: { min: 0, max: 10, ticks: [0, 2, 4, 6, 8, 10], label: "time since reflux starts (s)", tipFmt: (t) => `t = ${t.toFixed(1)} s` },
+    y: { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1], label: "fraction of offset", fmt: (y) => `${Math.round(y * 100)}%`, tipFmt: (y) => `${Math.round(y * 100)}%` },
+    series: trS,
+  });
+  const ramp = ["var(--q1)", "var(--q2)", "var(--q3)", "var(--q4)"];
+  const dcS = B.decay.map((d, i) => ({ name: `${d.vol} mL`, color: ramp[i], xs: d.t, ys: d.y }));
+  legend(document.getElementById("dc-legend"), dcS);
+  lineChart(document.getElementById("dc-chart"), {
+    aria: "Decay of pooled refluxed urine temperature",
+    x: { min: 0, max: 120, ticks: [0, 30, 60, 90, 120], label: "time after arrival (s)", tipFmt: (t) => `t = ${Math.round(t)} s` },
+    y: { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1], label: "fraction remaining", fmt: (y) => `${Math.round(y * 100)}%`, tipFmt: (y) => `${Math.round(y * 100)}%` },
+    vlines: [15], series: dcS,
+  });
+  const ndS = [
+    { name: "MR thermometry", color: "var(--s1)", xs: B.vols, ys: B.mr },
+    { name: "microwave radiometry", color: "var(--s2)", xs: B.vols, ys: B.rad },
+  ];
+  legend(document.getElementById("nd-legend"), ndS);
+  lineChart(document.getElementById("nd-chart"), {
+    aria: "Bladder temperature offset needed for detection against refluxed volume",
+    x: { min: 0, max: 6, ticks: [0, 1, 2, 3, 4, 5, 6], label: "refluxed volume (mL)", tipFmt: (v) => `${v.toFixed(2)} mL` },
+    y: { min: 0.2, max: 200, log: true, ticks: [0.3, 1, 3, 10, 30, 100], label: "offset needed (K, log)", tipFmt: (y) => `${y < 10 ? y.toFixed(2) : Math.round(y)} K` },
+    bands: [{ y0: 0.2, y1: 4, fill: "var(--ok)", opacity: 0.1, label: "±4 K fill" }],
+    series: ndS,
+  });
+})();
+</script>

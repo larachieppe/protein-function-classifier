@@ -1,0 +1,697 @@
+<title>Thermal Reflux Tracer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column (~42rem) with figures that break wider (~64rem); a lab-notebook report, cool clinical neutrals, heat carried only by the data. */
+:root {
+  --bg: #f4f7f8;
+  --surface: #ffffff;
+  --ink: #111a1f;
+  --ink-2: #44525c;
+  --muted: #6f7d87;
+  --rule: #d9e1e5;
+  --grid: #e8eef1;
+  --accent: #0d6670;
+  --accent-wash: #e1eff0;
+  --s1: #2a78d6;           /* bladder-side / series 1 (blue) */
+  --s2: #eb6834;           /* kidney-side / series 2 (orange) */
+  --s-neutral: #8c979f;    /* heated-spot voxel */
+  --q1: #86b6ef; --q2: #3987e5; --q3: #1c5cab; --q4: #0d366b;  /* ordinal blue ramp */
+  --ok: #1f7a4d; --warn: #9a6400; --bad: #b3261e;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --read: 42rem;
+  --wide: 64rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1316; --surface: #151c20; --ink: #e7edf0; --ink-2: #aab5bc; --muted: #84919a;
+    --rule: #26313a; --grid: #1d262c; --accent: #5cb8c0; --accent-wash: #15292c;
+    --s1: #3987e5; --s2: #d95926; --s-neutral: #7f8a92;
+    --q1: #9ec5f4; --q2: #5598e7; --q3: #2a78d6; --q4: #1c5cab;
+    --ok: #4cc28a; --warn: #e0a53a; --bad: #f07067;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1316; --surface: #151c20; --ink: #e7edf0; --ink-2: #aab5bc; --muted: #84919a;
+  --rule: #26313a; --grid: #1d262c; --accent: #5cb8c0; --accent-wash: #15292c;
+  --s1: #3987e5; --s2: #d95926; --s-neutral: #7f8a92;
+  --q1: #9ec5f4; --q2: #5598e7; --q3: #2a78d6; --q4: #1c5cab;
+  --ok: #4cc28a; --warn: #e0a53a; --bad: #f07067;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 1.0625rem; line-height: 1.6;
+  padding-inline: 16px; padding-block: 0 4rem;
+}
+main { display: flex; flex-direction: column; gap: 3.5rem; }
+.read { max-width: var(--read); margin-inline: auto; width: 100%; }
+.wide { max-width: var(--wide); margin-inline: auto; width: 100%; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.12; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 5.5vw, 3.4rem); font-weight: 700; }
+h2 { font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 500; }
+p { margin: 0; }
+.stack { display: flex; flex-direction: column; gap: 1rem; }
+.eyebrow {
+  font-family: var(--f-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+}
+.lede { font-size: 1.22rem; color: var(--ink-2); }
+.muted { color: var(--muted); }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, input:focus-visible, svg:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+.num { font-variant-numeric: tabular-nums; }
+
+header.top { padding-block: 3.5rem 0; }
+.badge {
+  display: inline-flex; align-items: center; gap: .4rem; align-self: flex-start;
+  font-family: var(--f-mono); font-size: .72rem; letter-spacing: .04em;
+  border: 1px solid var(--rule); border-radius: 999px; padding: .2rem .65rem; color: var(--ink-2); background: var(--surface);
+}
+.badge::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: var(--warn); }
+
+/* ---------- flow dial (hero) ---------- */
+.dial {
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 14px;
+  padding: clamp(1rem, 3vw, 1.75rem); display: flex; flex-direction: column; gap: 1.25rem;
+}
+.dial-head { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: flex-end; justify-content: space-between; }
+.dial-head > div { min-width: 0; }
+.readout { font-family: var(--f-display); font-size: clamp(1.25rem, 3vw, 1.6rem); font-weight: 500; }
+.readout .dir { font-weight: 700; }
+.readout .dir.reflux { color: var(--s2); }
+.readout .dir.ante { color: var(--s1); }
+.controls { display: flex; flex-wrap: wrap; gap: 1rem 1.75rem; align-items: center; }
+.slider-wrap { display: flex; flex-direction: column; gap: .35rem; min-width: 0; }
+.slider-wrap label, .seg-label { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.slider-ends { display: flex; justify-content: space-between; font-family: var(--f-mono); font-size: .72rem; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.seg button {
+  font: 500 .85rem var(--f-mono); padding: .45rem .8rem; border: 0; background: transparent; color: var(--ink-2); cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--accent-wash); color: var(--accent); font-weight: 600; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.dial-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 1.5rem; align-items: start; }
+@media (max-width: 760px) { .dial-grid { grid-template-columns: minmax(0, 1fr); } }
+.schematic svg { width: 100%; height: auto; display: block; }
+.caption { font-size: .9rem; color: var(--muted); }
+
+/* ---------- facts row ---------- */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.fact { background: var(--surface); padding: 1.1rem 1.2rem; display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+.fact .v { font-family: var(--f-display); font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fact .k { font-size: .92rem; color: var(--ink-2); line-height: 1.4; }
+
+/* ---------- figures ---------- */
+figure { margin: 0; display: flex; flex-direction: column; gap: .6rem; min-width: 0; }
+.fig-title { font-family: var(--f-display); font-weight: 500; font-size: 1rem; }
+.fig-grid { display: grid; gap: 2rem 1.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); }
+.fig-grid.two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); }
+.chart { position: relative; width: 100%; min-width: 0; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart svg text { font-family: var(--f-mono); font-size: 11px; fill: var(--muted); }
+.chart svg .axis-label { fill: var(--ink-2); }
+.legend { display: flex; flex-wrap: wrap; gap: .3rem 1rem; font-family: var(--f-mono); font-size: .75rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.legend svg { flex: none; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 2; min-width: 9rem;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: .5rem .65rem;
+  box-shadow: 0 6px 20px rgb(0 0 0 / .12); font-family: var(--f-mono); font-size: .75rem; color: var(--ink-2);
+  display: flex; flex-direction: column; gap: .2rem;
+}
+.tip[hidden] { display: none; }
+.tip .tx { color: var(--muted); }
+.tip .row { display: flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.tip .row b { color: var(--ink); font-weight: 600; min-width: 3.6rem; }
+
+/* ---------- tables, lists ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+td.n { font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: .3rem; font-family: var(--f-mono); font-size: .75rem; padding: .05rem .5rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+ul.plain { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: .5rem; }
+details { border-top: 1px solid var(--rule); padding-top: .6rem; }
+summary { cursor: pointer; font-family: var(--f-mono); font-size: .78rem; color: var(--ink-2); }
+details[open] summary { margin-bottom: .6rem; }
+
+.protocols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 1rem; }
+.protocol { border: 1px solid var(--rule); border-radius: 12px; padding: 1.1rem 1.2rem; background: var(--surface); display: flex; flex-direction: column; gap: .45rem; }
+.protocol .tag { font-family: var(--f-mono); font-size: .72rem; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; }
+.verdict { border-left: 3px solid var(--accent); padding-left: 1.1rem; }
+.eq { font-family: var(--f-mono); font-size: .88rem; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: .75rem 1rem; overflow-x: auto; white-space: nowrap; }
+footer { border-top: 1px solid var(--rule); padding-top: 1.25rem; font-size: .9rem; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) {
+  .plume { transition: opacity .35s ease; }
+}
+</style>
+
+<main>
+  <header class="top read stack">
+    <span class="badge">Exploratory model · not clinically validated</span>
+    <span class="eyebrow">Bioheat · vesicoureteral reflux</span>
+    <h1>Can a pulse of heat show which way urine flows?</h1>
+    <p class="lede">In vesicoureteral reflux (VUR), urine runs backwards from the bladder up the ureter towards the kidney. Today it is diagnosed with X-ray contrast (VCUG) or ultrasound microbubbles (ceVUS). This model asks whether a small temperature tracer could show the direction of flow instead, with no radiation and no contrast agent.</p>
+  </header>
+
+  <!-- Flow dial -->
+  <section class="wide" aria-labelledby="dial-h">
+    <div class="dial">
+      <div class="dial-head">
+        <div class="stack" style="gap:.35rem">
+          <span class="eyebrow" id="dial-h">Flow dial · protocol A</span>
+          <p class="readout" id="readout" aria-live="polite">–</p>
+        </div>
+        <div class="controls">
+          <div class="stack" style="gap:.35rem">
+            <span class="seg-label" id="gain-label">Heating pulse</span>
+            <div class="seg" role="group" aria-labelledby="gain-label">
+              <button type="button" id="gain-2" aria-pressed="true">+2 K</button>
+              <button type="button" id="gain-6" aria-pressed="false">+6 K</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slider-wrap">
+        <label for="vel">Mean urine velocity</label>
+        <input type="range" id="vel" min="0" max="14" step="1" value="12">
+        <div class="slider-ends"><span>← 5 cm/s antegrade</span><span>no flow</span><span>reflux 5 cm/s →</span></div>
+      </div>
+      <div class="dial-grid">
+        <div class="schematic stack" style="gap:.5rem">
+          <div id="schematic" role="img" aria-label="Ureter schematic showing the heated spot and the two thermometry voxels"></div>
+          <p class="caption">A 2 mm-radius ureter in perfused tissue. A focused-ultrasound spot heats the centre for 5 s. Thermometry voxels sit 10 mm either side.</p>
+        </div>
+        <figure>
+          <div class="legend" id="dial-legend"></div>
+          <div class="chart" id="dial-chart"></div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="wide" aria-label="Key numbers">
+    <div class="facts">
+      <div class="fact"><span class="v num">90 – 3,500</span><span class="k">Péclet number over 10 mm. Moving urine carries heat far further than it diffuses.</span></div>
+      <div class="fact"><span class="v num">0.004 K</span><span class="k">Rise 10 mm away with no flow. Without flow, the sensors stay flat.</span></div>
+      <div class="fact"><span class="v num">0.22 min</span><span class="k">Thermal dose (CEM43) of the stronger +6 K pulse, against ~240 min for tissue damage.</span></div>
+      <div class="fact"><span class="v num">0.3 – 1.4 K</span><span class="k">Bladder-fill offset MR thermometry needs to see 5 to 0.5 mL of reflux.</span></div>
+    </div>
+  </section>
+
+  <section class="read stack">
+    <span class="eyebrow">The model</span>
+    <h2>Two ways to use heat as a tracer</h2>
+    <p>The script couples the Pennes bioheat equation in tissue to heat carried by urine in the ureter lumen, solved on an axisymmetric finite-volume grid. Temperatures are rises above core temperature (37 °C).</p>
+    <div class="eq">ρc (∂T/∂t + u·∇T) = ∇·(k∇T) + ω<sub>b</sub>ρ<sub>b</sub>c<sub>b</sub>(T<sub>a</sub> − T) + Q</div>
+  </section>
+  <section class="wide protocols">
+    <div class="protocol"><span class="tag">Protocol A · time-of-flight</span><h3>Heat a spot, watch both sides</h3><p>Heat a 1.5 mm spot on the ureter for 5 s, for example with focused ultrasound. Read one thermometry voxel 10 mm towards the kidney and one 10 mm towards the bladder. The side that warms is downstream.</p></div>
+    <div class="protocol"><span class="tag">Protocol B · thermal VCUG</span><h3>Fill the bladder off-temperature</h3><p>Fill the bladder with saline a few kelvin warmer or cooler than the body, as a VCUG already does with contrast. If urine refluxes during voiding, the temperature anomaly reaches the renal pelvis, where MR thermometry or microwave radiometry can look for it.</p></div>
+  </section>
+
+  <section class="read stack">
+    <span class="eyebrow">Why it can work</span>
+    <h2>Flow beats diffusion by orders of magnitude</h2>
+    <p>The Péclet number compares heat carried by flow with heat that spreads by conduction. Above 1, flow wins. In the ureter it is far above 1 in every regime, so the direction of the warm plume reports the direction of flow almost perfectly. The open question is signal size, not direction.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Flow regime</th><th>Velocity</th><th>Péclet (10 mm)</th><th>Transit ÷ radial diffusion time</th></tr></thead>
+        <tbody>
+          <tr><td>Mean urine production (1 mL/min)</td><td class="n">0.13 cm/s</td><td class="n">~90</td><td class="n">1.6</td></tr>
+          <tr><td>Peristaltic bolus</td><td class="n">2.5 cm/s</td><td class="n">~1,700</td><td class="n">0.08</td></tr>
+          <tr><td>Voiding reflux jet</td><td class="n">5 cm/s</td><td class="n">~3,500</td><td class="n">0.04</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Heat leaks from urine into the ureter wall in about 5 s. Perfusion clears tissue heat over about 18 min, so it hardly matters on these timescales.</p>
+  </section>
+
+  <section class="wide stack" style="gap:1.5rem">
+    <div class="read stack" style="margin-inline:0">
+      <span class="eyebrow">Protocol A · results</span>
+      <h2>Direction is clean. Faster flow gives a weaker signal.</h2>
+      <p>The heat is spread over more urine as flow speeds up, so the downstream rise falls roughly as P/(ρc·Q). Flow also cools the heated spot, which is itself a flow meter but does not give direction.</p>
+    </div>
+    <div class="fig-grid two">
+      <figure>
+        <figcaption class="fig-title">Peak rise at each voxel, +2 K pulse</figcaption>
+        <div class="legend" id="wash-legend"></div>
+        <div class="chart" id="wash-chart"></div>
+        <p class="caption">Negative velocity is normal antegrade flow; positive is reflux. The upstream voxel stays below 0.0001 K at every speed.</p>
+      </figure>
+      <figure>
+        <figcaption class="fig-title">Chance of calling the direction correctly</figcaption>
+        <div class="legend" id="det-legend"></div>
+        <div class="chart" id="det-chart"></div>
+        <p class="caption">7 frames at 1 Hz, one-sided test at 5% false positives. Reflux shown; antegrade is symmetric.</p>
+      </figure>
+    </div>
+    <details class="read" style="margin-inline:0">
+      <summary>Detection probabilities as a table</summary>
+      <div class="table-wrap"><table id="det-table"></table></div>
+    </details>
+  </section>
+
+  <section class="wide stack" style="gap:1.5rem">
+    <div class="read stack" style="margin-inline:0">
+      <span class="eyebrow">Protocol A · variant</span>
+      <h2>Heat the still urine first, then wait for the jet</h2>
+      <p>Heating urine that is already moving spreads the heat thin. If the spot is heated while the urine is still, the first reflux jet pushes the whole warm slug past the kidney-side voxel. With only the gentle pulse, that gives a 0.57 K spike on the kidney side and nothing on the bladder side. The spike lasts under a second, so the readout has to sample at about 5 Hz or faster.</p>
+    </div>
+    <figure>
+      <figcaption class="fig-title">2 s reflux jet at 3 cm/s (≈0.75 mL), arriving at t = 4 s</figcaption>
+      <div class="legend" id="pulse-legend"></div>
+      <div class="chart" id="pulse-chart"></div>
+    </figure>
+  </section>
+
+  <section class="wide stack" style="gap:1.5rem">
+    <div class="read stack" style="margin-inline:0">
+      <span class="eyebrow">Protocol B · results</span>
+      <h2>A thermal VCUG is within reach of MR thermometry</h2>
+      <p>Urine climbing a 12 cm (paediatric) ureter keeps most of its temperature offset. Dilated ureters, which go with worse reflux, keep more. Once pooled in the renal pelvis, the anomaly lasts tens of seconds, which is plenty of time to image.</p>
+    </div>
+    <div class="fig-grid">
+      <figure>
+        <figcaption class="fig-title">Offset arriving at the pelvis</figcaption>
+        <div class="legend" id="tr-legend"></div>
+        <div class="chart" id="tr-chart"></div>
+        <p class="caption">Fraction of the bladder's offset in urine reaching the top of the ureter.</p>
+      </figure>
+      <figure>
+        <figcaption class="fig-title">Decay of pooled refluxed urine</figcaption>
+        <div class="legend" id="dc-legend"></div>
+        <div class="chart" id="dc-chart"></div>
+        <p class="caption">Mean offset of a pool in renal-sinus tissue, as a fraction of its starting value.</p>
+      </figure>
+      <figure>
+        <figcaption class="fig-title">Bladder offset needed for 3σ detection</figcaption>
+        <div class="legend" id="nd-legend"></div>
+        <div class="chart" id="nd-chart"></div>
+        <p class="caption">Read 15 s after reflux. Log scale. The shaded band is a comfortable ±4 K fill.</p>
+      </figure>
+    </div>
+    <div class="read stack" style="margin-inline:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Refluxed volume</th><th>MR thermometry<br>0.5 K per voxel</th><th>Microwave radiometry<br>0.1 K, ~30 mL view</th></tr></thead>
+          <tbody>
+            <tr><td class="n">0.5 mL</td><td class="n">1.4 K <span class="pill ok">✓ feasible</span></td><td class="n">~70 K <span class="pill bad">✕ no</span></td></tr>
+            <tr><td class="n">1 mL</td><td class="n">0.8 K <span class="pill ok">✓ feasible</span></td><td class="n">~29 K <span class="pill bad">✕ no</span></td></tr>
+            <tr><td class="n">2 mL</td><td class="n">0.5 K <span class="pill ok">✓ feasible</span></td><td class="n">~13 K <span class="pill bad">✕ no</span></td></tr>
+            <tr><td class="n">5 mL</td><td class="n">0.3 K <span class="pill ok">✓ feasible</span></td><td class="n">~4.7 K <span class="pill warn">△ marginal</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>A cool fill (30–33 °C) is the attractive option: it adds no heat at all. Radiometry fails because its field of view is far larger than the reflux, so the signal is diluted.</p>
+    </div>
+  </section>
+
+  <section class="read stack">
+    <span class="eyebrow">Verdict</span>
+    <h2>The physics works. Measuring the temperature is the hard part.</h2>
+    <div class="verdict stack">
+      <p><strong>Heat gives an unambiguous direction signal</strong>, and the doses needed are far inside safe limits.</p>
+      <p><strong>Protocol B with MR thermometry looks most practical:</strong> a contrast-free MR voiding cystography that only needs a bladder fill a few degrees off body temperature.</p>
+      <p><strong>Protocol A suits catheter or intra-operative use</strong>, where a thermistor or fibre-optic sensor with about 0.05 K noise makes the 0.1–0.5 K plume decisive.</p>
+    </div>
+    <h3>What the model leaves out</h3>
+    <ul class="plain">
+      <li><strong>Motion during voiding</strong> corrupts MR (PRF-shift) thermometry. This is probably the biggest practical problem.</li>
+      <li><strong>The ureter is not a steady tube.</strong> It collapses between peristaltic boluses, and a collapsed lumen carries no heat.</li>
+      <li><strong>Fat gives no PRF thermometry signal</strong>, and the renal sinus is fatty.</li>
+      <li><strong>Kidney cortex perfusion</strong> is about 100× the tissue value used here. It matters only if refluxed urine sits against the parenchyma.</li>
+      <li><strong>Contrast ultrasound already avoids radiation.</strong> A thermal method would compete on needing no agent at all and on estimating volume.</li>
+    </ul>
+    <h3>Next steps</h3>
+    <ul class="plain">
+      <li>Replace steady Poiseuille flow with travelling peristaltic boluses fitted to published data.</li>
+      <li>Simulate the full chain, from bladder heat loss during filling to a renal pelvis segmented from real MR or CT.</li>
+      <li>Model ultrasound echo-shift thermometry for a bedside, ceVUS-like workflow.</li>
+      <li>Build a bench phantom: a silicone tube in a perfused tissue mimic, a reversible syringe pump and a fibre-optic readout.</li>
+    </ul>
+  </section>
+
+  <footer class="read stack" style="gap:.5rem">
+    <p>Model and data: <code>explorations/bioheat_reflux/bioheat_reflux.py</code> in <a href="https://github.com/larachieppe/protein-function-classifier/tree/claude/charming-thompson-9yx6zq/explorations/bioheat_reflux">larachieppe/protein-function-classifier</a>. Tissue properties are literature-typical values, and no result here has been checked against measurements.</p>
+  </footer>
+</main>
+
+<script id="page-data" type="application/json">{"A":{"t":[0.0,0.22,0.4,0.62,0.8,1.03,1.2,1.43,1.6,1.83,2.01,2.23,2.41,2.63,2.81,3.03,3.21,3.43,3.61,3.83,4.01,4.23,4.41,4.64,4.81,5.04,5.22,5.44,5.62,5.84,6.02,6.24,6.42,6.64,6.82,7.04,7.22,7.44,7.62,7.8,8.02,8.2,8.42,8.6,8.83,9.0,9.23,9.41,9.63,9.81,10.03,10.21,10.43,10.61,10.83,11.01,11.23,11.41,11.63,11.81,12.04,12.21,12.44,12.62,12.84,13.02,13.24,13.42,13.64,13.82,14.04,14.22,14.44,14.62,14.84,15.02,15.2,15.42,15.6,15.82,16.0,16.23,16.4,16.63,16.81,17.03,17.21,17.43,17.61,17.83,18.01,18.23,18.41,18.63,18.81,19.03,19.21,19.44,19.61,19.84,20.01,20.24,20.42,20.64,20.82,21.04,21.22,21.44,21.62,21.84,22.02,22.24,22.42,22.6,22.82,23.0,23.22,23.4,23.63,23.8,24.03,24.21,24.43,24.61,24.83,25.01,25.23,25.41,25.63,25.81,26.03,26.21,26.43,26.61,26.84,27.01,27.24,27.41,27.64,27.82,28.04,28.22,28.44,28.62,28.84,29.02,29.24,29.42,29.64,29.82,30.0],"traces":{"-5":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"bladder":[0.0,0.0163,0.0284,0.0341,0.038,0.0409,0.0433,0.0452,0.0469,0.0484,0.0498,0.051,0.0522,0.0532,0.0542,0.0551,0.0559,0.0567,0.0575,0.0582,0.0589,0.0595,0.0602,0.0607,0.0613,0.0618,0.046,0.0345,0.0292,0.0258,0.0233,0.0214,0.0198,0.0185,0.0174,0.0164,0.0155,0.0147,0.014,0.0133,0.0128,0.0122,0.0117,0.0112,0.0108,0.0104,0.01,0.0097,0.0093,0.009,0.0087,0.0084,0.0082,0.0079,0.0077,0.0075,0.0072,0.007,0.0068,0.0067,0.0065,0.0063,0.0061,0.006,0.0058,0.0057,0.0056,0.0054,0.0053,0.0052,0.0051,0.0049,0.0048,0.0047,0.0046,0.0045,0.0044,0.0043,0.0043,0.0042,0.0041,0.004,0.0039,0.0039,0.0038,0.0037,0.0037,0.0036,0.0035,0.0035,0.0034,0.0033,0.0033,0.0032,0.0032,0.0031,0.0031,0.003,0.003,0.0029,0.0029,0.0028,0.0028,0.0028,0.0027,0.0027,0.0026,0.0026,0.0026,0.0025,0.0025,0.0025,0.0024,0.0024,0.0024,0.0023,0.0023,0.0023,0.0022,0.0022,0.0022,0.0021,0.0021,0.0021,0.0021,0.002,0.002,0.002,0.002,0.0019,0.0019,0.0019,0.0019,0.0019,0.0018,0.0018,0.0018,0.0018,0.0018,0.0017,0.0017,0.0017,0.0017,0.0017,0.0016,0.0016,0.0016,0.0016,0.0016,0.0016,0.0015],"focus":[0.0,0.0282,0.0331,0.0361,0.0383,0.0402,0.0417,0.0431,0.0443,0.0454,0.0464,0.0473,0.0482,0.049,0.0497,0.0504,0.051,0.0516,0.0522,0.0527,0.0532,0.0537,0.0542,0.0546,0.055,0.0554,0.0276,0.023,0.0204,0.0185,0.017,0.0158,0.0147,0.0138,0.0129,0.0122,0.0115,0.011,0.0104,0.0099,0.0095,0.009,0.0087,0.0083,0.008,0.0076,0.0074,0.0071,0.0068,0.0066,0.0064,0.0061,0.0059,0.0057,0.0056,0.0054,0.0052,0.0051,0.0049,0.0048,0.0047,0.0045,0.0044,0.0043,0.0042,0.0041,0.004,0.0039,0.0038,0.0037,0.0036,0.0035,0.0034,0.0033,0.0033,0.0032,0.0031,0.0031,0.003,0.0029,0.0029,0.0028,0.0028,0.0027,0.0027,0.0026,0.0026,0.0025,0.0025,0.0024,0.0024,0.0023,0.0023,0.0022,0.0022,0.0022,0.0021,0.0021,0.0021,0.002,0.002,0.002,0.0019,0.0019,0.0019,0.0018,0.0018,0.0018,0.0018,0.0017,0.0017,0.0017,0.0017,0.0016,0.0016,0.0016,0.0016,0.0015,0.0015,0.0015,0.0015,0.0015,0.0014,0.0014,0.0014,0.0014,0.0014,0.0014,0.0013,0.0013,0.0013,0.0013,0.0013,0.0013,0.0012,0.0012,0.0012,0.0012,0.0012,0.0012,0.0012,0.0011,0.0011,0.0011,0.0011,0.0011,0.0011,0.0011,0.0011,0.001,0.001]},"-3":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"bladder":[0.0,0.0089,0.0329,0.0442,0.0512,0.0564,0.0604,0.0637,0.0665,0.069,0.0712,0.0732,0.0751,0.0767,0.0783,0.0797,0.0811,0.0824,0.0836,0.0847,0.0858,0.0868,0.0878,0.0887,0.0896,0.0904,0.0823,0.0592,0.0486,0.0422,0.0378,0.0345,0.0318,0.0296,0.0277,0.026,0.0246,0.0233,0.0222,0.0211,0.0202,0.0193,0.0185,0.0178,0.0171,0.0164,0.0158,0.0153,0.0147,0.0142,0.0138,0.0133,0.0129,0.0125,0.0121,0.0118,0.0114,0.0111,0.0108,0.0105,0.0102,0.01,0.0097,0.0095,0.0092,0.009,0.0088,0.0086,0.0084,0.0082,0.008,0.0078,0.0077,0.0075,0.0073,0.0072,0.007,0.0069,0.0067,0.0066,0.0065,0.0064,0.0062,0.0061,0.006,0.0059,0.0058,0.0057,0.0056,0.0055,0.0054,0.0053,0.0052,0.0051,0.005,0.0049,0.0049,0.0048,0.0047,0.0046,0.0046,0.0045,0.0044,0.0044,0.0043,0.0042,0.0042,0.0041,0.0041,0.004,0.0039,0.0039,0.0038,0.0038,0.0037,0.0037,0.0036,0.0036,0.0035,0.0035,0.0034,0.0034,0.0034,0.0033,0.0033,0.0032,0.0032,0.0032,0.0031,0.0031,0.003,0.003,0.003,0.0029,0.0029,0.0029,0.0028,0.0028,0.0028,0.0027,0.0027,0.0027,0.0027,0.0026,0.0026,0.0026,0.0025,0.0025,0.0025,0.0025,0.0024],"focus":[0.0,0.0407,0.0493,0.0543,0.0579,0.0609,0.0634,0.0655,0.0674,0.0692,0.0707,0.0722,0.0735,0.0747,0.0759,0.0769,0.0779,0.0789,0.0798,0.0806,0.0814,0.0821,0.0828,0.0835,0.0842,0.0848,0.0447,0.0367,0.0322,0.0291,0.0267,0.0247,0.023,0.0215,0.0202,0.0191,0.018,0.0171,0.0162,0.0155,0.0148,0.0141,0.0135,0.0129,0.0124,0.0119,0.0115,0.011,0.0106,0.0103,0.0099,0.0096,0.0093,0.009,0.0087,0.0084,0.0082,0.0079,0.0077,0.0075,0.0073,0.0071,0.0069,0.0067,0.0065,0.0063,0.0062,0.006,0.0059,0.0057,0.0056,0.0055,0.0053,0.0052,0.0051,0.005,0.0049,0.0048,0.0047,0.0046,0.0045,0.0044,0.0043,0.0042,0.0041,0.0041,0.004,0.0039,0.0038,0.0038,0.0037,0.0036,0.0036,0.0035,0.0034,0.0034,0.0033,0.0033,0.0032,0.0032,0.0031,0.0031,0.003,0.003,0.0029,0.0029,0.0028,0.0028,0.0027,0.0027,0.0027,0.0026,0.0026,0.0025,0.0025,0.0025,0.0024,0.0024,0.0024,0.0023,0.0023,0.0023,0.0022,0.0022,0.0022,0.0022,0.0021,0.0021,0.0021,0.0021,0.002,0.002,0.002,0.002,0.0019,0.0019,0.0019,0.0019,0.0018,0.0018,0.0018,0.0018,0.0018,0.0017,0.0017,0.0017,0.0017,0.0017,0.0016,0.0016,0.0016]},"-2":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"bladder":[0.0,0.0015,0.0288,0.049,0.0611,0.0696,0.0761,0.0813,0.0857,0.0895,0.0929,0.0959,0.0987,0.1012,0.1035,0.1056,0.1076,0.1095,0.1113,0.1129,0.1145,0.116,0.1174,0.1188,0.1201,0.1213,0.121,0.0948,0.0758,0.0647,0.0572,0.0517,0.0474,0.0439,0.041,0.0384,0.0362,0.0343,0.0326,0.031,0.0296,0.0283,0.0271,0.026,0.025,0.024,0.0231,0.0223,0.0215,0.0208,0.0201,0.0195,0.0189,0.0183,0.0177,0.0172,0.0167,0.0163,0.0158,0.0154,0.015,0.0146,0.0142,0.0138,0.0135,0.0132,0.0129,0.0125,0.0123,0.012,0.0117,0.0114,0.0112,0.011,0.0107,0.0105,0.0103,0.0101,0.0099,0.0097,0.0095,0.0093,0.0091,0.0089,0.0088,0.0086,0.0085,0.0083,0.0082,0.008,0.0079,0.0077,0.0076,0.0075,0.0074,0.0072,0.0071,0.007,0.0069,0.0068,0.0067,0.0066,0.0065,0.0064,0.0063,0.0062,0.0061,0.006,0.0059,0.0058,0.0058,0.0057,0.0056,0.0055,0.0054,0.0054,0.0053,0.0052,0.0052,0.0051,0.005,0.005,0.0049,0.0048,0.0048,0.0047,0.0047,0.0046,0.0046,0.0045,0.0044,0.0044,0.0043,0.0043,0.0042,0.0042,0.0041,0.0041,0.0041,0.004,0.004,0.0039,0.0039,0.0038,0.0038,0.0038,0.0037,0.0037,0.0036,0.0036,0.0036],"focus":[0.0,0.0531,0.0664,0.074,0.0794,0.0837,0.0873,0.0904,0.0931,0.0956,0.0978,0.0999,0.1017,0.1035,0.1051,0.1066,0.108,0.1094,0.1106,0.1118,0.1129,0.114,0.115,0.116,0.1169,0.1178,0.0655,0.053,0.0462,0.0416,0.038,0.0351,0.0326,0.0305,0.0286,0.027,0.0255,0.0242,0.023,0.0219,0.0209,0.02,0.0191,0.0183,0.0176,0.0169,0.0163,0.0157,0.0151,0.0146,0.0141,0.0136,0.0131,0.0127,0.0123,0.0119,0.0116,0.0112,0.0109,0.0106,0.0103,0.01,0.0097,0.0095,0.0092,0.009,0.0088,0.0085,0.0083,0.0081,0.0079,0.0078,0.0076,0.0074,0.0072,0.0071,0.0069,0.0068,0.0066,0.0065,0.0064,0.0062,0.0061,0.006,0.0059,0.0058,0.0056,0.0055,0.0054,0.0053,0.0052,0.0051,0.0051,0.005,0.0049,0.0048,0.0047,0.0046,0.0046,0.0045,0.0044,0.0043,0.0043,0.0042,0.0041,0.0041,0.004,0.0039,0.0039,0.0038,0.0038,0.0037,0.0037,0.0036,0.0036,0.0035,0.0035,0.0034,0.0034,0.0033,0.0033,0.0032,0.0032,0.0031,0.0031,0.0031,0.003,0.003,0.003,0.0029,0.0029,0.0028,0.0028,0.0028,0.0027,0.0027,0.0027,0.0026,0.0026,0.0026,0.0026,0.0025,0.0025,0.0025,0.0024,0.0024,0.0024,0.0024,0.0023,0.0023,0.0023]},"-1":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"bladder":[0.0,0.0,0.0029,0.0258,0.0564,0.0792,0.096,0.1089,0.1194,0.1281,0.1357,0.1423,0.1482,0.1536,0.1585,0.1629,0.1671,0.171,0.1746,0.178,0.1812,0.1842,0.187,0.1898,0.1924,0.1949,0.1972,0.1966,0.1759,0.1474,0.1266,0.1118,0.1007,0.092,0.085,0.0792,0.0742,0.0698,0.066,0.0626,0.0596,0.0568,0.0543,0.052,0.0499,0.048,0.0462,0.0445,0.0429,0.0415,0.0401,0.0388,0.0375,0.0364,0.0353,0.0342,0.0333,0.0323,0.0314,0.0306,0.0298,0.029,0.0282,0.0275,0.0268,0.0262,0.0256,0.025,0.0244,0.0238,0.0233,0.0228,0.0223,0.0218,0.0213,0.0209,0.0204,0.02,0.0196,0.0192,0.0189,0.0185,0.0181,0.0178,0.0175,0.0171,0.0168,0.0165,0.0162,0.016,0.0157,0.0154,0.0151,0.0149,0.0146,0.0144,0.0142,0.0139,0.0137,0.0135,0.0133,0.0131,0.0129,0.0127,0.0125,0.0123,0.0121,0.012,0.0118,0.0116,0.0115,0.0113,0.0111,0.011,0.0108,0.0107,0.0105,0.0104,0.0103,0.0101,0.01,0.0099,0.0097,0.0096,0.0095,0.0094,0.0093,0.0092,0.009,0.0089,0.0088,0.0087,0.0086,0.0085,0.0084,0.0083,0.0082,0.0081,0.0081,0.008,0.0079,0.0078,0.0077,0.0076,0.0075,0.0075,0.0074,0.0073,0.0072,0.0071,0.0071],"focus":[0.0,0.0762,0.1058,0.1216,0.1324,0.1408,0.1477,0.1535,0.1586,0.1632,0.1673,0.1711,0.1745,0.1777,0.1806,0.1834,0.1859,0.1884,0.1906,0.1928,0.1948,0.1968,0.1986,0.2004,0.202,0.2036,0.129,0.1009,0.0865,0.077,0.0699,0.0643,0.0596,0.0557,0.0522,0.0492,0.0465,0.0441,0.0419,0.0399,0.038,0.0364,0.0348,0.0334,0.032,0.0308,0.0296,0.0285,0.0275,0.0265,0.0256,0.0247,0.0239,0.0232,0.0224,0.0218,0.0211,0.0205,0.0199,0.0193,0.0188,0.0183,0.0178,0.0173,0.0169,0.0164,0.016,0.0156,0.0152,0.0149,0.0145,0.0142,0.0139,0.0135,0.0132,0.013,0.0127,0.0124,0.0121,0.0119,0.0116,0.0114,0.0112,0.011,0.0107,0.0105,0.0103,0.0101,0.01,0.0098,0.0096,0.0094,0.0093,0.0091,0.0089,0.0088,0.0086,0.0085,0.0084,0.0082,0.0081,0.008,0.0078,0.0077,0.0076,0.0075,0.0074,0.0072,0.0071,0.007,0.0069,0.0068,0.0067,0.0066,0.0065,0.0064,0.0064,0.0063,0.0062,0.0061,0.006,0.0059,0.0059,0.0058,0.0057,0.0056,0.0056,0.0055,0.0054,0.0054,0.0053,0.0052,0.0052,0.0051,0.005,0.005,0.0049,0.0049,0.0048,0.0048,0.0047,0.0046,0.0046,0.0045,0.0045,0.0044,0.0044,0.0043,0.0043,0.0043,0.0042]},"-0.5":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"bladder":[0.0,0.0,0.0,0.0006,0.0057,0.0219,0.049,0.0795,0.1076,0.1315,0.1517,0.1688,0.1837,0.1968,0.2085,0.219,0.2286,0.2374,0.2456,0.2532,0.2603,0.267,0.2733,0.2792,0.2848,0.2902,0.2953,0.3001,0.3042,0.3036,0.2917,0.2687,0.2422,0.2179,0.1977,0.1811,0.1674,0.1558,0.146,0.1374,0.1299,0.1233,0.1173,0.1119,0.107,0.1026,0.0984,0.0947,0.0911,0.0879,0.0848,0.082,0.0793,0.0768,0.0744,0.0722,0.0701,0.0681,0.0661,0.0643,0.0626,0.061,0.0594,0.0579,0.0564,0.0551,0.0537,0.0525,0.0512,0.0501,0.0489,0.0479,0.0468,0.0458,0.0448,0.0439,0.043,0.0421,0.0413,0.0405,0.0397,0.0389,0.0382,0.0374,0.0367,0.0361,0.0354,0.0348,0.0342,0.0336,0.033,0.0324,0.0319,0.0313,0.0308,0.0303,0.0298,0.0293,0.0289,0.0284,0.028,0.0275,0.0271,0.0267,0.0263,0.0259,0.0255,0.0252,0.0248,0.0245,0.0241,0.0238,0.0234,0.0231,0.0228,0.0225,0.0222,0.0219,0.0216,0.0213,0.0211,0.0208,0.0205,0.0203,0.02,0.0198,0.0195,0.0193,0.019,0.0188,0.0186,0.0184,0.0181,0.0179,0.0177,0.0175,0.0173,0.0171,0.0169,0.0167,0.0166,0.0164,0.0162,0.016,0.0158,0.0157,0.0155,0.0153,0.0152,0.015,0.0149],"focus":[0.0,0.0925,0.1514,0.1865,0.2099,0.2273,0.2412,0.2528,0.2627,0.2715,0.2794,0.2864,0.2929,0.2989,0.3044,0.3095,0.3143,0.3188,0.323,0.327,0.3308,0.3344,0.3378,0.3411,0.3442,0.3471,0.2575,0.2013,0.1688,0.1478,0.1329,0.1213,0.112,0.1041,0.0974,0.0916,0.0865,0.0819,0.0777,0.074,0.0706,0.0674,0.0645,0.0618,0.0594,0.0571,0.0549,0.0529,0.051,0.0492,0.0475,0.046,0.0445,0.043,0.0417,0.0404,0.0392,0.0381,0.037,0.036,0.035,0.034,0.0331,0.0322,0.0314,0.0306,0.0299,0.0291,0.0284,0.0278,0.0271,0.0265,0.0259,0.0253,0.0247,0.0242,0.0237,0.0232,0.0227,0.0222,0.0218,0.0214,0.0209,0.0205,0.0201,0.0197,0.0194,0.019,0.0187,0.0183,0.018,0.0177,0.0174,0.0171,0.0168,0.0165,0.0162,0.0159,0.0157,0.0154,0.0152,0.0149,0.0147,0.0145,0.0143,0.014,0.0138,0.0136,0.0134,0.0132,0.013,0.0128,0.0127,0.0125,0.0123,0.0121,0.012,0.0118,0.0116,0.0115,0.0113,0.0112,0.011,0.0109,0.0108,0.0106,0.0105,0.0103,0.0102,0.0101,0.01,0.0098,0.0097,0.0096,0.0095,0.0094,0.0093,0.0092,0.0091,0.009,0.0089,0.0088,0.0087,0.0086,0.0085,0.0084,0.0083,0.0082,0.0081,0.008,0.0079]},"-0.25":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0003,0.0013,0.0042,0.0109,0.0226,0.04,0.0623,0.088,0.1153,0.1427,0.1692,0.1941,0.2172,0.2385,0.2582,0.2763,0.2932,0.3088,0.3235,0.3372,0.3501,0.3623,0.3739,0.3849,0.3953,0.405,0.4136,0.4198,0.422,0.4187,0.4094,0.395,0.3768,0.3568,0.3365,0.3169,0.2987,0.282,0.267,0.2534,0.2411,0.23,0.22,0.2108,0.2024,0.1946,0.1875,0.1808,0.1746,0.1689,0.1634,0.1584,0.1536,0.1491,0.1448,0.1408,0.137,0.1333,0.1299,0.1266,0.1234,0.1204,0.1175,0.1147,0.1121,0.1095,0.1071,0.1048,0.1025,0.1003,0.0982,0.0962,0.0942,0.0924,0.0905,0.0888,0.0871,0.0854,0.0838,0.0823,0.0808,0.0793,0.0779,0.0765,0.0752,0.0739,0.0726,0.0714,0.0702,0.0691,0.0679,0.0668,0.0658,0.0647,0.0637,0.0627,0.0618,0.0608,0.0599,0.059,0.0582,0.0573,0.0565,0.0557,0.0549,0.0541,0.0534,0.0526,0.0519,0.0512,0.0505,0.0498,0.0492,0.0485,0.0479,0.0473,0.0467,0.0461,0.0455,0.0449,0.0444,0.0438,0.0433,0.0428,0.0423,0.0417,0.0413,0.0408,0.0403,0.0398,0.0394,0.0389,0.0385,0.038,0.0376,0.0372,0.0368,0.0364,0.036,0.0356,0.0352,0.0348,0.0345,0.0341,0.0338,0.0334],"focus":[0.0,0.0994,0.1833,0.2488,0.2987,0.3372,0.3677,0.3927,0.4137,0.4319,0.4479,0.4622,0.4751,0.4869,0.4977,0.5078,0.5171,0.5258,0.534,0.5418,0.5491,0.556,0.5625,0.5688,0.5747,0.5804,0.4864,0.4078,0.3473,0.3021,0.2683,0.2422,0.2215,0.2046,0.1904,0.1782,0.1677,0.1583,0.15,0.1426,0.1358,0.1297,0.124,0.1188,0.114,0.1095,0.1054,0.1015,0.0979,0.0945,0.0913,0.0883,0.0854,0.0827,0.0802,0.0778,0.0755,0.0733,0.0712,0.0692,0.0673,0.0655,0.0638,0.0622,0.0606,0.0591,0.0576,0.0562,0.0549,0.0536,0.0524,0.0512,0.0501,0.049,0.0479,0.0469,0.0459,0.0449,0.044,0.0431,0.0423,0.0414,0.0406,0.0398,0.0391,0.0383,0.0376,0.0369,0.0363,0.0356,0.035,0.0344,0.0338,0.0332,0.0327,0.0321,0.0316,0.0311,0.0306,0.0301,0.0296,0.0291,0.0287,0.0282,0.0278,0.0274,0.027,0.0266,0.0262,0.0258,0.0254,0.0251,0.0247,0.0244,0.024,0.0237,0.0234,0.0231,0.0228,0.0225,0.0222,0.0219,0.0216,0.0213,0.0211,0.0208,0.0205,0.0203,0.02,0.0198,0.0195,0.0193,0.0191,0.0189,0.0186,0.0184,0.0182,0.018,0.0178,0.0176,0.0174,0.0172,0.017,0.0168,0.0166,0.0165,0.0163,0.0161,0.0159,0.0158,0.0156]},"-0.13":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0001,0.0002,0.0006,0.0012,0.0027,0.0046,0.0083,0.0126,0.02,0.0277,0.0397,0.0511,0.0676,0.0825,0.1028,0.1202,0.1431,0.162,0.1861,0.2056,0.2299,0.2491,0.2728,0.2914,0.3141,0.3317,0.353,0.3693,0.3887,0.4032,0.4198,0.4315,0.4417,0.452,0.458,0.4627,0.4641,0.4633,0.4605,0.4549,0.4488,0.4397,0.4315,0.4203,0.4108,0.3987,0.3889,0.3768,0.3672,0.3554,0.3463,0.3354,0.3269,0.3168,0.3091,0.2998,0.2927,0.2843,0.2779,0.2702,0.2643,0.2573,0.2519,0.2454,0.2405,0.2346,0.2301,0.2246,0.2204,0.2163,0.2115,0.2077,0.2031,0.1996,0.1954,0.1921,0.1882,0.1851,0.1814,0.1785,0.1751,0.1724,0.1691,0.1665,0.1634,0.161,0.1581,0.1559,0.1531,0.1509,0.1483,0.1463,0.1438,0.1419,0.1395,0.1377,0.1354,0.1337,0.1315,0.1299,0.1278,0.1262,0.1243,0.1228,0.1209,0.1194,0.118,0.1163,0.1149,0.1132,0.1119,0.1103,0.1091,0.1075,0.1063,0.1049,0.1037,0.1023,0.1012,0.0998,0.0988,0.0975,0.0964,0.0952,0.0942,0.093,0.092,0.0909,0.09,0.0888,0.088,0.0869,0.086,0.085,0.0842,0.0832,0.0824,0.0814,0.0806,0.0797,0.0789,0.078,0.0773,0.0766],"focus":[0.0,0.1124,0.1956,0.2891,0.3552,0.4275,0.4778,0.5325,0.5708,0.6128,0.6426,0.6758,0.6997,0.7268,0.7465,0.7692,0.786,0.8055,0.82,0.8371,0.8499,0.865,0.8765,0.89,0.9004,0.9127,0.8316,0.7378,0.6706,0.5971,0.5463,0.492,0.4549,0.4152,0.388,0.3585,0.3381,0.3156,0.2997,0.2854,0.2693,0.2577,0.2446,0.235,0.224,0.2159,0.2065,0.1996,0.1915,0.1854,0.1784,0.1731,0.1668,0.1621,0.1565,0.1523,0.1473,0.1435,0.139,0.1356,0.1315,0.1284,0.1247,0.1219,0.1185,0.1159,0.1127,0.1103,0.1075,0.1053,0.1026,0.1006,0.0981,0.0962,0.0939,0.0922,0.0905,0.0884,0.0868,0.0849,0.0834,0.0816,0.0802,0.0785,0.0772,0.0756,0.0744,0.0729,0.0717,0.0703,0.0693,0.0679,0.0669,0.0657,0.0647,0.0635,0.0626,0.0615,0.0606,0.0595,0.0587,0.0577,0.0569,0.056,0.0552,0.0543,0.0536,0.0527,0.0521,0.0512,0.0506,0.0498,0.0492,0.0486,0.0478,0.0473,0.0466,0.046,0.0453,0.0448,0.0442,0.0437,0.0431,0.0426,0.042,0.0415,0.041,0.0405,0.04,0.0395,0.039,0.0386,0.0381,0.0377,0.0372,0.0368,0.0364,0.036,0.0356,0.0352,0.0348,0.0344,0.034,0.0337,0.0333,0.033,0.0326,0.0323,0.0319,0.0316,0.0313]},"0":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0004,0.0004,0.0004,0.0004,0.0004,0.0005,0.0005,0.0005,0.0006,0.0006,0.0006,0.0006,0.0007,0.0007,0.0007,0.0008,0.0008,0.0008,0.0009,0.0009,0.001,0.001,0.001,0.0011,0.0011,0.0012,0.0012,0.0012,0.0013,0.0013,0.0014,0.0014,0.0015,0.0015,0.0016,0.0016,0.0017,0.0017,0.0018,0.0018,0.0019,0.0019,0.002,0.0021,0.0021,0.0022,0.0022,0.0023,0.0024,0.0024,0.0025,0.0025,0.0026,0.0027,0.0028,0.0028,0.0029,0.0029,0.003,0.0031,0.0032,0.0032,0.0033,0.0034,0.0034,0.0035,0.0036,0.0036,0.0037,0.0038,0.0039,0.0039,0.004,0.0041,0.0042,0.0042,0.0043],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0004,0.0004,0.0004,0.0004,0.0005,0.0005,0.0005,0.0005,0.0005,0.0006,0.0006,0.0006,0.0007,0.0007,0.0007,0.0007,0.0008,0.0008,0.0009,0.0009,0.0009,0.001,0.001,0.001,0.0011,0.0011,0.0012,0.0012,0.0012,0.0013,0.0013,0.0014,0.0014,0.0014,0.0015,0.0015,0.0016,0.0016,0.0017,0.0017,0.0018,0.0018,0.0019,0.0019,0.002,0.0021,0.0021,0.0022,0.0022,0.0023,0.0023,0.0024,0.0024,0.0025,0.0026,0.0026,0.0027,0.0027,0.0028,0.0029,0.0029,0.003,0.0031,0.0031,0.0032,0.0033,0.0033,0.0034,0.0034,0.0035,0.0036,0.0037,0.0037,0.0038],"focus":[0.0,0.114,0.203,0.3117,0.3966,0.5001,0.5811,0.68,0.7573,0.8519,0.9259,1.0164,1.0873,1.174,1.242,1.3253,1.3906,1.4707,1.5335,1.6105,1.6709,1.7451,1.8033,1.8748,1.931,2.0,1.9628,1.9178,1.8831,1.8412,1.8088,1.7697,1.7394,1.7029,1.6746,1.6404,1.6139,1.5818,1.5569,1.5327,1.5033,1.4806,1.453,1.4315,1.4055,1.3852,1.3606,1.3415,1.3183,1.3002,1.2781,1.261,1.2401,1.2239,1.204,1.1886,1.1698,1.1551,1.1372,1.1232,1.1061,1.0928,1.0765,1.0638,1.0483,1.0362,1.0213,1.0097,0.9956,0.9845,0.9709,0.9603,0.9473,0.9371,0.9246,0.9149,0.9053,0.8936,0.8843,0.8731,0.8642,0.8534,0.8449,0.8345,0.8263,0.8163,0.8084,0.7987,0.7912,0.7818,0.7745,0.7656,0.7585,0.7498,0.743,0.7347,0.7281,0.72,0.7137,0.7059,0.6997,0.6922,0.6863,0.679,0.6732,0.6661,0.6606,0.6537,0.6484,0.6417,0.6365,0.6301,0.625,0.62,0.6139,0.6091,0.6031,0.5984,0.5926,0.588,0.5824,0.578,0.5725,0.5682,0.5629,0.5588,0.5536,0.5495,0.5445,0.5406,0.5357,0.5319,0.5271,0.5234,0.5188,0.5151,0.5106,0.5071,0.5027,0.4992,0.495,0.4916,0.4874,0.4842,0.4801,0.4769,0.473,0.4698,0.466,0.4629,0.4599]},"0.13":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0001,0.0003,0.0007,0.0014,0.0031,0.0053,0.0096,0.0144,0.0227,0.0312,0.0444,0.0568,0.0746,0.0905,0.1121,0.1304,0.1543,0.174,0.1989,0.2188,0.2437,0.2633,0.2873,0.3061,0.329,0.3467,0.368,0.3844,0.4037,0.418,0.4342,0.4455,0.4551,0.4645,0.4697,0.4731,0.4736,0.4714,0.4676,0.4606,0.4536,0.4434,0.4343,0.4222,0.4122,0.3995,0.3893,0.3767,0.3669,0.3549,0.3457,0.3346,0.326,0.3159,0.3081,0.2988,0.2917,0.2833,0.2768,0.2691,0.2633,0.2563,0.2509,0.2445,0.2395,0.2336,0.2291,0.2237,0.2195,0.2154,0.2106,0.2068,0.2023,0.1988,0.1946,0.1913,0.1874,0.1843,0.1806,0.1778,0.1743,0.1716,0.1683,0.1658,0.1627,0.1603,0.1574,0.1551,0.1524,0.1502,0.1476,0.1456,0.1431,0.1412,0.1388,0.137,0.1348,0.133,0.1309,0.1292,0.1272,0.1256,0.1237,0.1221,0.1203,0.1188,0.1174,0.1157,0.1143,0.1127,0.1114,0.1098,0.1085,0.107,0.1058,0.1043,0.1032,0.1018,0.1007,0.0993,0.0983,0.097,0.0959,0.0947,0.0937,0.0925,0.0915,0.0904,0.0895,0.0884,0.0875,0.0864,0.0856,0.0845,0.0837,0.0827,0.0819,0.0809,0.0802,0.0792,0.0785,0.0776,0.0769,0.0762],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001],"focus":[0.0,0.1124,0.1956,0.2891,0.3552,0.4275,0.4778,0.5325,0.5708,0.6128,0.6426,0.6758,0.6997,0.7268,0.7465,0.7692,0.786,0.8055,0.82,0.8371,0.8499,0.865,0.8765,0.89,0.9004,0.9127,0.8316,0.7378,0.6706,0.5971,0.5463,0.492,0.4549,0.4152,0.388,0.3585,0.3381,0.3156,0.2997,0.2854,0.2693,0.2577,0.2446,0.235,0.224,0.2159,0.2065,0.1996,0.1915,0.1854,0.1784,0.1731,0.1668,0.1621,0.1565,0.1523,0.1473,0.1435,0.139,0.1356,0.1315,0.1284,0.1247,0.1219,0.1185,0.1159,0.1127,0.1103,0.1075,0.1053,0.1026,0.1006,0.0981,0.0962,0.0939,0.0922,0.0905,0.0884,0.0868,0.0849,0.0834,0.0816,0.0802,0.0785,0.0772,0.0756,0.0744,0.0729,0.0717,0.0703,0.0693,0.0679,0.0669,0.0657,0.0647,0.0635,0.0626,0.0615,0.0606,0.0595,0.0587,0.0577,0.0569,0.056,0.0552,0.0543,0.0536,0.0527,0.0521,0.0512,0.0506,0.0498,0.0492,0.0486,0.0478,0.0473,0.0466,0.046,0.0453,0.0448,0.0442,0.0437,0.0431,0.0426,0.042,0.0415,0.041,0.0405,0.04,0.0395,0.039,0.0386,0.0381,0.0377,0.0372,0.0368,0.0364,0.036,0.0356,0.0352,0.0348,0.0344,0.034,0.0337,0.0333,0.033,0.0326,0.0323,0.0319,0.0316,0.0313]},"0.25":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0003,0.0015,0.0049,0.0124,0.0254,0.0443,0.0681,0.095,0.1231,0.1509,0.1775,0.2024,0.2254,0.2466,0.2661,0.2841,0.3008,0.3164,0.3309,0.3445,0.3573,0.3694,0.3809,0.3918,0.4022,0.4119,0.4202,0.4259,0.4271,0.4225,0.4117,0.3958,0.3764,0.3556,0.3348,0.315,0.2968,0.2802,0.2652,0.2517,0.2396,0.2287,0.2187,0.2096,0.2013,0.1936,0.1865,0.1799,0.1738,0.1681,0.1627,0.1576,0.1529,0.1484,0.1442,0.1402,0.1364,0.1328,0.1293,0.126,0.1229,0.1199,0.117,0.1143,0.1116,0.1091,0.1067,0.1043,0.1021,0.0999,0.0978,0.0958,0.0939,0.092,0.0902,0.0884,0.0867,0.0851,0.0835,0.0819,0.0804,0.079,0.0776,0.0762,0.0749,0.0736,0.0723,0.0711,0.0699,0.0688,0.0677,0.0666,0.0655,0.0645,0.0635,0.0625,0.0615,0.0606,0.0597,0.0588,0.0579,0.0571,0.0563,0.0555,0.0547,0.0539,0.0531,0.0524,0.0517,0.051,0.0503,0.0496,0.049,0.0483,0.0477,0.0471,0.0465,0.0459,0.0453,0.0447,0.0442,0.0436,0.0431,0.0426,0.0421,0.0416,0.0411,0.0406,0.0401,0.0397,0.0392,0.0387,0.0383,0.0379,0.0375,0.037,0.0366,0.0362,0.0358,0.0354,0.0351,0.0347,0.0343,0.034,0.0336,0.0333],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"focus":[0.0,0.0994,0.1833,0.2488,0.2987,0.3372,0.3677,0.3927,0.4137,0.4319,0.4479,0.4622,0.4751,0.4869,0.4977,0.5078,0.5171,0.5258,0.534,0.5418,0.5491,0.556,0.5625,0.5688,0.5747,0.5804,0.4864,0.4078,0.3473,0.3021,0.2683,0.2422,0.2215,0.2046,0.1904,0.1782,0.1677,0.1583,0.15,0.1426,0.1358,0.1297,0.124,0.1188,0.114,0.1095,0.1054,0.1015,0.0979,0.0945,0.0913,0.0883,0.0854,0.0827,0.0802,0.0778,0.0755,0.0733,0.0712,0.0692,0.0673,0.0655,0.0638,0.0622,0.0606,0.0591,0.0576,0.0562,0.0549,0.0536,0.0524,0.0512,0.0501,0.049,0.0479,0.0469,0.0459,0.0449,0.044,0.0431,0.0423,0.0414,0.0406,0.0398,0.0391,0.0383,0.0376,0.0369,0.0363,0.0356,0.035,0.0344,0.0338,0.0332,0.0327,0.0321,0.0316,0.0311,0.0306,0.0301,0.0296,0.0291,0.0287,0.0282,0.0278,0.0274,0.027,0.0266,0.0262,0.0258,0.0254,0.0251,0.0247,0.0244,0.024,0.0237,0.0234,0.0231,0.0228,0.0225,0.0222,0.0219,0.0216,0.0213,0.0211,0.0208,0.0205,0.0203,0.02,0.0198,0.0195,0.0193,0.0191,0.0189,0.0186,0.0184,0.0182,0.018,0.0178,0.0176,0.0174,0.0172,0.017,0.0168,0.0166,0.0165,0.0163,0.0161,0.0159,0.0158,0.0156]},"0.5":{"kidney":[0.0,0.0,0.0,0.0007,0.0065,0.0242,0.0527,0.0838,0.1119,0.1356,0.1555,0.1725,0.1873,0.2002,0.2118,0.2223,0.2319,0.2406,0.2487,0.2563,0.2634,0.27,0.2763,0.2822,0.2878,0.2931,0.2982,0.3031,0.307,0.3057,0.2922,0.2678,0.2407,0.2165,0.1964,0.18,0.1665,0.1551,0.1453,0.1369,0.1294,0.1228,0.1169,0.1115,0.1067,0.1022,0.0982,0.0944,0.0909,0.0877,0.0846,0.0818,0.0791,0.0766,0.0742,0.072,0.0699,0.0679,0.066,0.0642,0.0625,0.0608,0.0592,0.0577,0.0563,0.0549,0.0536,0.0523,0.0511,0.05,0.0488,0.0478,0.0467,0.0457,0.0447,0.0438,0.0429,0.042,0.0412,0.0404,0.0396,0.0388,0.0381,0.0374,0.0367,0.036,0.0353,0.0347,0.0341,0.0335,0.0329,0.0324,0.0318,0.0313,0.0308,0.0302,0.0298,0.0293,0.0288,0.0284,0.0279,0.0275,0.0271,0.0267,0.0263,0.0259,0.0255,0.0251,0.0248,0.0244,0.0241,0.0237,0.0234,0.0231,0.0228,0.0224,0.0221,0.0218,0.0216,0.0213,0.021,0.0207,0.0205,0.0202,0.02,0.0197,0.0195,0.0192,0.019,0.0188,0.0185,0.0183,0.0181,0.0179,0.0177,0.0175,0.0173,0.0171,0.0169,0.0167,0.0165,0.0163,0.0162,0.016,0.0158,0.0156,0.0155,0.0153,0.0151,0.015,0.0148],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"focus":[0.0,0.0925,0.1514,0.1865,0.2099,0.2273,0.2412,0.2528,0.2627,0.2715,0.2794,0.2864,0.2929,0.2989,0.3044,0.3095,0.3143,0.3188,0.323,0.327,0.3308,0.3344,0.3378,0.3411,0.3442,0.3471,0.2575,0.2013,0.1688,0.1478,0.1329,0.1213,0.112,0.1041,0.0974,0.0916,0.0865,0.0819,0.0777,0.074,0.0706,0.0674,0.0645,0.0618,0.0594,0.0571,0.0549,0.0529,0.051,0.0492,0.0475,0.046,0.0445,0.043,0.0417,0.0404,0.0392,0.0381,0.037,0.036,0.035,0.034,0.0331,0.0322,0.0314,0.0306,0.0299,0.0291,0.0284,0.0278,0.0271,0.0265,0.0259,0.0253,0.0247,0.0242,0.0237,0.0232,0.0227,0.0222,0.0218,0.0214,0.0209,0.0205,0.0201,0.0197,0.0194,0.019,0.0187,0.0183,0.018,0.0177,0.0174,0.0171,0.0168,0.0165,0.0162,0.0159,0.0157,0.0154,0.0152,0.0149,0.0147,0.0145,0.0143,0.014,0.0138,0.0136,0.0134,0.0132,0.013,0.0128,0.0127,0.0125,0.0123,0.0121,0.012,0.0118,0.0116,0.0115,0.0113,0.0112,0.011,0.0109,0.0108,0.0106,0.0105,0.0103,0.0102,0.0101,0.01,0.0098,0.0097,0.0096,0.0095,0.0094,0.0093,0.0092,0.0091,0.009,0.0089,0.0088,0.0087,0.0086,0.0085,0.0084,0.0083,0.0082,0.0081,0.008,0.0079]},"1":{"kidney":[0.0,0.0,0.0033,0.0278,0.0586,0.0812,0.0978,0.1106,0.121,0.1297,0.1372,0.1438,0.1497,0.155,0.1599,0.1644,0.1685,0.1723,0.1759,0.1793,0.1825,0.1855,0.1884,0.1911,0.1937,0.1962,0.1986,0.1975,0.1753,0.1466,0.126,0.1113,0.1004,0.0918,0.0848,0.079,0.074,0.0697,0.0659,0.0625,0.0595,0.0568,0.0543,0.052,0.0499,0.0479,0.0461,0.0445,0.0429,0.0414,0.04,0.0388,0.0375,0.0364,0.0353,0.0342,0.0332,0.0323,0.0314,0.0306,0.0297,0.029,0.0282,0.0275,0.0268,0.0262,0.0255,0.0249,0.0244,0.0238,0.0233,0.0228,0.0223,0.0218,0.0213,0.0209,0.0204,0.02,0.0196,0.0192,0.0189,0.0185,0.0181,0.0178,0.0175,0.0171,0.0168,0.0165,0.0162,0.0159,0.0157,0.0154,0.0151,0.0149,0.0146,0.0144,0.0142,0.0139,0.0137,0.0135,0.0133,0.0131,0.0129,0.0127,0.0125,0.0123,0.0121,0.012,0.0118,0.0116,0.0115,0.0113,0.0111,0.011,0.0108,0.0107,0.0105,0.0104,0.0103,0.0101,0.01,0.0099,0.0097,0.0096,0.0095,0.0094,0.0093,0.0092,0.009,0.0089,0.0088,0.0087,0.0086,0.0085,0.0084,0.0083,0.0082,0.0081,0.008,0.008,0.0079,0.0078,0.0077,0.0076,0.0075,0.0075,0.0074,0.0073,0.0072,0.0071,0.0071],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"focus":[0.0,0.0762,0.1058,0.1216,0.1324,0.1408,0.1477,0.1535,0.1586,0.1632,0.1673,0.1711,0.1745,0.1777,0.1806,0.1834,0.1859,0.1884,0.1906,0.1928,0.1948,0.1968,0.1986,0.2004,0.202,0.2036,0.129,0.1009,0.0865,0.077,0.0699,0.0643,0.0596,0.0557,0.0522,0.0492,0.0465,0.0441,0.0419,0.0399,0.038,0.0364,0.0348,0.0334,0.032,0.0308,0.0296,0.0285,0.0275,0.0265,0.0256,0.0247,0.0239,0.0232,0.0224,0.0218,0.0211,0.0205,0.0199,0.0193,0.0188,0.0183,0.0178,0.0173,0.0169,0.0164,0.016,0.0156,0.0152,0.0149,0.0145,0.0142,0.0139,0.0135,0.0132,0.013,0.0127,0.0124,0.0121,0.0119,0.0116,0.0114,0.0112,0.011,0.0107,0.0105,0.0103,0.0101,0.01,0.0098,0.0096,0.0094,0.0093,0.0091,0.0089,0.0088,0.0086,0.0085,0.0084,0.0082,0.0081,0.008,0.0078,0.0077,0.0076,0.0075,0.0074,0.0072,0.0071,0.007,0.0069,0.0068,0.0067,0.0066,0.0065,0.0064,0.0064,0.0063,0.0062,0.0061,0.006,0.0059,0.0059,0.0058,0.0057,0.0056,0.0056,0.0055,0.0054,0.0054,0.0053,0.0052,0.0052,0.0051,0.005,0.005,0.0049,0.0049,0.0048,0.0048,0.0047,0.0046,0.0046,0.0045,0.0045,0.0044,0.0044,0.0043,0.0043,0.0043,0.0042]},"2":{"kidney":[0.0,0.0017,0.0299,0.0499,0.0619,0.0704,0.0768,0.082,0.0864,0.0902,0.0936,0.0966,0.0994,0.1019,0.1042,0.1063,0.1083,0.1102,0.112,0.1136,0.1152,0.1167,0.1181,0.1195,0.1208,0.122,0.1215,0.0944,0.0755,0.0645,0.0571,0.0517,0.0474,0.0439,0.041,0.0384,0.0362,0.0343,0.0326,0.031,0.0296,0.0283,0.0271,0.026,0.025,0.024,0.0232,0.0223,0.0216,0.0208,0.0201,0.0195,0.0189,0.0183,0.0178,0.0172,0.0167,0.0163,0.0158,0.0154,0.015,0.0146,0.0142,0.0139,0.0135,0.0132,0.0129,0.0126,0.0123,0.012,0.0117,0.0115,0.0112,0.011,0.0107,0.0105,0.0103,0.0101,0.0099,0.0097,0.0095,0.0093,0.0091,0.009,0.0088,0.0086,0.0085,0.0083,0.0082,0.008,0.0079,0.0078,0.0076,0.0075,0.0074,0.0072,0.0071,0.007,0.0069,0.0068,0.0067,0.0066,0.0065,0.0064,0.0063,0.0062,0.0061,0.006,0.0059,0.0058,0.0058,0.0057,0.0056,0.0055,0.0055,0.0054,0.0053,0.0052,0.0052,0.0051,0.005,0.005,0.0049,0.0048,0.0048,0.0047,0.0047,0.0046,0.0046,0.0045,0.0044,0.0044,0.0043,0.0043,0.0042,0.0042,0.0041,0.0041,0.0041,0.004,0.004,0.0039,0.0039,0.0038,0.0038,0.0038,0.0037,0.0037,0.0036,0.0036,0.0036],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"focus":[0.0,0.0531,0.0664,0.074,0.0794,0.0837,0.0873,0.0904,0.0931,0.0956,0.0978,0.0999,0.1017,0.1035,0.1051,0.1066,0.108,0.1094,0.1106,0.1118,0.1129,0.114,0.115,0.116,0.1169,0.1178,0.0655,0.053,0.0462,0.0416,0.038,0.0351,0.0326,0.0305,0.0286,0.027,0.0255,0.0242,0.023,0.0219,0.0209,0.02,0.0191,0.0183,0.0176,0.0169,0.0163,0.0157,0.0151,0.0146,0.0141,0.0136,0.0131,0.0127,0.0123,0.0119,0.0116,0.0112,0.0109,0.0106,0.0103,0.01,0.0097,0.0095,0.0092,0.009,0.0088,0.0085,0.0083,0.0081,0.0079,0.0078,0.0076,0.0074,0.0072,0.0071,0.0069,0.0068,0.0066,0.0065,0.0064,0.0062,0.0061,0.006,0.0059,0.0058,0.0056,0.0055,0.0054,0.0053,0.0052,0.0051,0.0051,0.005,0.0049,0.0048,0.0047,0.0046,0.0046,0.0045,0.0044,0.0043,0.0043,0.0042,0.0041,0.0041,0.004,0.0039,0.0039,0.0038,0.0038,0.0037,0.0037,0.0036,0.0036,0.0035,0.0035,0.0034,0.0034,0.0033,0.0033,0.0032,0.0032,0.0031,0.0031,0.0031,0.003,0.003,0.003,0.0029,0.0029,0.0028,0.0028,0.0028,0.0027,0.0027,0.0027,0.0026,0.0026,0.0026,0.0026,0.0025,0.0025,0.0025,0.0024,0.0024,0.0024,0.0024,0.0023,0.0023,0.0023]},"3":{"kidney":[0.0,0.0096,0.0335,0.0447,0.0517,0.0568,0.0608,0.0641,0.067,0.0695,0.0717,0.0737,0.0755,0.0772,0.0788,0.0802,0.0816,0.0828,0.084,0.0852,0.0862,0.0873,0.0882,0.0892,0.09,0.0909,0.0821,0.059,0.0485,0.0422,0.0378,0.0345,0.0318,0.0296,0.0277,0.0261,0.0246,0.0234,0.0222,0.0212,0.0202,0.0193,0.0185,0.0178,0.0171,0.0165,0.0159,0.0153,0.0148,0.0143,0.0138,0.0134,0.0129,0.0125,0.0122,0.0118,0.0115,0.0111,0.0108,0.0105,0.0103,0.01,0.0097,0.0095,0.0092,0.009,0.0088,0.0086,0.0084,0.0082,0.008,0.0078,0.0077,0.0075,0.0073,0.0072,0.007,0.0069,0.0068,0.0066,0.0065,0.0064,0.0062,0.0061,0.006,0.0059,0.0058,0.0057,0.0056,0.0055,0.0054,0.0053,0.0052,0.0051,0.005,0.005,0.0049,0.0048,0.0047,0.0046,0.0046,0.0045,0.0044,0.0044,0.0043,0.0042,0.0042,0.0041,0.0041,0.004,0.0039,0.0039,0.0038,0.0038,0.0037,0.0037,0.0036,0.0036,0.0035,0.0035,0.0034,0.0034,0.0034,0.0033,0.0033,0.0032,0.0032,0.0032,0.0031,0.0031,0.003,0.003,0.003,0.0029,0.0029,0.0029,0.0028,0.0028,0.0028,0.0027,0.0027,0.0027,0.0027,0.0026,0.0026,0.0026,0.0025,0.0025,0.0025,0.0025,0.0024],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"focus":[0.0,0.0407,0.0493,0.0543,0.0579,0.0609,0.0634,0.0655,0.0674,0.0692,0.0707,0.0722,0.0735,0.0747,0.0759,0.0769,0.0779,0.0789,0.0798,0.0806,0.0814,0.0821,0.0828,0.0835,0.0842,0.0848,0.0447,0.0367,0.0322,0.0291,0.0267,0.0247,0.023,0.0215,0.0202,0.0191,0.018,0.0171,0.0162,0.0155,0.0148,0.0141,0.0135,0.0129,0.0124,0.0119,0.0115,0.011,0.0106,0.0103,0.0099,0.0096,0.0093,0.009,0.0087,0.0084,0.0082,0.0079,0.0077,0.0075,0.0073,0.0071,0.0069,0.0067,0.0065,0.0063,0.0062,0.006,0.0059,0.0057,0.0056,0.0055,0.0053,0.0052,0.0051,0.005,0.0049,0.0048,0.0047,0.0046,0.0045,0.0044,0.0043,0.0042,0.0041,0.0041,0.004,0.0039,0.0038,0.0038,0.0037,0.0036,0.0036,0.0035,0.0034,0.0034,0.0033,0.0033,0.0032,0.0032,0.0031,0.0031,0.003,0.003,0.0029,0.0029,0.0028,0.0028,0.0027,0.0027,0.0027,0.0026,0.0026,0.0025,0.0025,0.0025,0.0024,0.0024,0.0024,0.0023,0.0023,0.0023,0.0022,0.0022,0.0022,0.0022,0.0021,0.0021,0.0021,0.0021,0.002,0.002,0.002,0.002,0.0019,0.0019,0.0019,0.0019,0.0018,0.0018,0.0018,0.0018,0.0018,0.0017,0.0017,0.0017,0.0017,0.0017,0.0016,0.0016,0.0016]},"5":{"kidney":[0.0,0.0167,0.0287,0.0344,0.0383,0.0412,0.0435,0.0455,0.0472,0.0487,0.0501,0.0513,0.0525,0.0535,0.0545,0.0554,0.0562,0.057,0.0578,0.0585,0.0592,0.0598,0.0605,0.061,0.0616,0.0621,0.0459,0.0345,0.0292,0.0258,0.0233,0.0214,0.0199,0.0185,0.0174,0.0164,0.0155,0.0147,0.014,0.0134,0.0128,0.0122,0.0117,0.0113,0.0108,0.0104,0.01,0.0097,0.0094,0.009,0.0087,0.0085,0.0082,0.0079,0.0077,0.0075,0.0073,0.0071,0.0069,0.0067,0.0065,0.0063,0.0062,0.006,0.0059,0.0057,0.0056,0.0054,0.0053,0.0052,0.0051,0.005,0.0048,0.0047,0.0046,0.0045,0.0045,0.0044,0.0043,0.0042,0.0041,0.004,0.0039,0.0039,0.0038,0.0037,0.0037,0.0036,0.0035,0.0035,0.0034,0.0034,0.0033,0.0032,0.0032,0.0031,0.0031,0.003,0.003,0.0029,0.0029,0.0028,0.0028,0.0028,0.0027,0.0027,0.0026,0.0026,0.0026,0.0025,0.0025,0.0025,0.0024,0.0024,0.0024,0.0023,0.0023,0.0023,0.0022,0.0022,0.0022,0.0022,0.0021,0.0021,0.0021,0.002,0.002,0.002,0.002,0.002,0.0019,0.0019,0.0019,0.0019,0.0018,0.0018,0.0018,0.0018,0.0018,0.0017,0.0017,0.0017,0.0017,0.0017,0.0016,0.0016,0.0016,0.0016,0.0016,0.0016,0.0015],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"focus":[0.0,0.0282,0.0331,0.0361,0.0383,0.0402,0.0417,0.0431,0.0443,0.0454,0.0464,0.0473,0.0482,0.049,0.0497,0.0504,0.051,0.0516,0.0522,0.0527,0.0532,0.0537,0.0542,0.0546,0.055,0.0554,0.0276,0.023,0.0204,0.0185,0.017,0.0158,0.0147,0.0138,0.0129,0.0122,0.0115,0.011,0.0104,0.0099,0.0095,0.009,0.0087,0.0083,0.008,0.0076,0.0074,0.0071,0.0068,0.0066,0.0064,0.0061,0.0059,0.0057,0.0056,0.0054,0.0052,0.0051,0.0049,0.0048,0.0047,0.0045,0.0044,0.0043,0.0042,0.0041,0.004,0.0039,0.0038,0.0037,0.0036,0.0035,0.0034,0.0033,0.0033,0.0032,0.0031,0.0031,0.003,0.0029,0.0029,0.0028,0.0028,0.0027,0.0027,0.0026,0.0026,0.0025,0.0025,0.0024,0.0024,0.0023,0.0023,0.0022,0.0022,0.0022,0.0021,0.0021,0.0021,0.002,0.002,0.002,0.0019,0.0019,0.0019,0.0018,0.0018,0.0018,0.0018,0.0017,0.0017,0.0017,0.0017,0.0016,0.0016,0.0016,0.0016,0.0015,0.0015,0.0015,0.0015,0.0015,0.0014,0.0014,0.0014,0.0014,0.0014,0.0014,0.0013,0.0013,0.0013,0.0013,0.0013,0.0013,0.0012,0.0012,0.0012,0.0012,0.0012,0.0012,0.0012,0.0011,0.0011,0.0011,0.0011,0.0011,0.0011,0.0011,0.0011,0.001,0.001]}},"pulse":{"kidney":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.05,0.5736,0.4241,0.3057,0.2427,0.2044,0.1795,0.1629,0.1513,0.1428,0.1362,0.1218,0.1031,0.0907,0.0817,0.0747,0.0691,0.0644,0.0604,0.057,0.0563,0.0559,0.0555,0.0553,0.0551,0.0549,0.0548,0.0546,0.0545,0.0544,0.0543,0.0542,0.0541,0.054,0.0539,0.0538,0.0537,0.0536,0.0535,0.0533,0.0532,0.0531,0.053,0.0529,0.0528,0.0527,0.0526,0.0525,0.0524,0.0523,0.0522,0.0521,0.052,0.0519,0.0518,0.0516,0.0515,0.0514,0.0513,0.0512,0.0511,0.051,0.0508,0.0507,0.0506,0.0505,0.0504,0.0502,0.0501,0.05,0.0499,0.0498,0.0496,0.0495,0.0494,0.0493,0.0492,0.049,0.0489,0.0488,0.0487,0.0485,0.0484,0.0483,0.0482,0.0481,0.0479,0.0478,0.0477,0.0476,0.0474,0.0473,0.0472,0.0471,0.0469,0.0468,0.0467,0.0466,0.0464,0.0463,0.0462,0.0461,0.046,0.0458,0.0457,0.0456,0.0455,0.0453,0.0452,0.0451,0.045,0.0449,0.0447,0.0446,0.0445,0.0444,0.0443,0.0442,0.044,0.0439,0.0438,0.0437,0.0436,0.0435,0.0433,0.0432,0.0431,0.043,0.0429,0.0428,0.0427,0.0426,0.0424,0.0423,0.0422,0.0421,0.042,0.0419,0.0418,0.0417,0.0416,0.0415,0.0414,0.0412,0.0411,0.041,0.0409,0.0408,0.0407,0.0406,0.0405,0.0404,0.0403,0.0402,0.0401,0.04,0.0399,0.0398,0.0397,0.0396,0.0395,0.0394,0.0393,0.0392,0.0391,0.039,0.0389,0.0389,0.0388,0.0387,0.0386,0.0385,0.0384,0.0383,0.0382,0.0381,0.038,0.0379,0.0379,0.0378,0.0377,0.0376,0.0375,0.0374,0.0373,0.0372,0.0372,0.0371,0.037,0.0369,0.0368,0.0367,0.0367,0.0366,0.0365,0.0364,0.0363,0.0363,0.0362,0.0361,0.036,0.0359,0.0359,0.0358,0.0357,0.0356,0.0356,0.0355,0.0354,0.0353,0.0353,0.0352,0.0351,0.035,0.035,0.0349,0.0348,0.0347,0.0347,0.0346,0.0345,0.0345,0.0344,0.0343,0.0343,0.0342,0.0341,0.0341,0.034,0.0339,0.0339,0.0338,0.0337,0.0337,0.0336,0.0335,0.0335,0.0334,0.0333,0.0333,0.0332,0.0331,0.0331,0.033,0.033,0.0329,0.0328,0.0328,0.0327,0.0327,0.0326,0.0325,0.0325,0.0324,0.0324,0.0323,0.0322,0.0322,0.0321,0.0321],"bladder":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0001,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0002,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0003,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0004,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0005,0.0006,0.0006,0.0006,0.0006,0.0006,0.0006,0.0006,0.0006,0.0006,0.0006,0.0006,0.0006,0.0007,0.0007,0.0007,0.0007,0.0007,0.0007,0.0007,0.0007,0.0007,0.0007,0.0007,0.0007,0.0008,0.0008,0.0008,0.0008,0.0008,0.0008,0.0008,0.0008,0.0008,0.0008,0.0008,0.0009,0.0009,0.0009,0.0009,0.0009,0.0009,0.0009,0.0009,0.0009,0.0009],"focus":[0.0,0.0514,0.1022,0.1524,0.202,0.251,0.2994,0.3472,0.3945,0.4412,0.4874,0.5331,0.5782,0.6228,0.6669,0.7106,0.7537,0.7964,0.8386,0.8803,0.9216,0.9624,1.0028,1.0428,1.0824,1.1216,1.1603,1.1987,1.2367,1.2743,1.3115,1.3483,1.3848,1.4209,1.4567,1.4921,1.5272,1.562,1.5964,1.6305,1.6643,0.5586,0.2849,0.2046,0.1685,0.1487,0.1366,0.1286,0.1228,0.1185,0.1151,0.081,0.0696,0.0628,0.0578,0.0538,0.0505,0.0476,0.0451,0.0429,0.0409,0.0525,0.0624,0.0711,0.0788,0.0859,0.0924,0.0983,0.1039,0.1091,0.1139,0.1184,0.1227,0.1267,0.1305,0.134,0.1374,0.1406,0.1436,0.1465,0.1492,0.1517,0.1542,0.1565,0.1587,0.1608,0.1628,0.1647,0.1665,0.1682,0.1698,0.1713,0.1728,0.1742,0.1755,0.1768,0.178,0.1792,0.1803,0.1813,0.1823,0.1832,0.1841,0.1849,0.1857,0.1864,0.1872,0.1878,0.1884,0.189,0.1896,0.1901,0.1906,0.1911,0.1915,0.1919,0.1923,0.1926,0.1929,0.1932,0.1935,0.1937,0.1939,0.1941,0.1943,0.1945,0.1946,0.1947,0.1948,0.1949,0.195,0.195,0.195,0.195,0.195,0.195,0.195,0.1949,0.1949,0.1948,0.1947,0.1946,0.1945,0.1944,0.1943,0.1941,0.194,0.1938,0.1936,0.1934,0.1933,0.1931,0.1929,0.1926,0.1924,0.1922,0.1919,0.1917,0.1914,0.1912,0.1909,0.1907,0.1904,0.1901,0.1898,0.1895,0.1892,0.1889,0.1886,0.1883,0.188,0.1876,0.1873,0.187,0.1867,0.1863,0.186,0.1856,0.1853,0.1849,0.1846,0.1842,0.1839,0.1835,0.1831,0.1828,0.1824,0.182,0.1817,0.1813,0.1809,0.1805,0.1801,0.1798,0.1794,0.179,0.1786,0.1782,0.1778,0.1774,0.177,0.1766,0.1763,0.1759,0.1755,0.1751,0.1747,0.1743,0.1739,0.1735,0.1731,0.1727,0.1723,0.1719,0.1715,0.1711,0.1707,0.1703,0.1699,0.1695,0.1691,0.1687,0.1682,0.1678,0.1674,0.167,0.1666,0.1662,0.1658,0.1654,0.165,0.1646,0.1642,0.1638,0.1634,0.163,0.1626,0.1622,0.1618,0.1614,0.161,0.1606,0.1602,0.1599,0.1595,0.1591,0.1587,0.1583,0.1579,0.1575,0.1571,0.1567,0.1563,0.1559,0.1556,0.1552,0.1548,0.1544,0.154,0.1536,0.1532,0.1529,0.1525,0.1521,0.1517,0.1513,0.151,0.1506,0.1502,0.1498,0.1495,0.1491,0.1487,0.1483,0.148,0.1476,0.1472,0.1469,0.1465,0.1461,0.1458,0.1454,0.1451,0.1447,0.1443,0.144,0.1436,0.1433,0.1429,0.1425,0.1422,0.1418,0.1415,0.1411,0.1408,0.1404,0.1401,0.1397,0.1394,0.1391,0.1387]},"pulse_t":[0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0,4.1,4.2,4.3,4.4,4.5,4.6,4.7,4.8,4.9,5.0,5.1,5.2,5.3,5.4,5.5,5.6,5.7,5.8,5.9,6.0,6.1,6.2,6.3,6.4,6.5,6.6,6.7,6.8,6.9,7.0,7.1,7.2,7.3,7.4,7.5,7.6,7.7,7.8,7.9,8.0,8.1,8.2,8.3,8.4,8.5,8.6,8.7,8.8,8.9,9.0,9.1,9.2,9.3,9.4,9.5,9.6,9.7,9.8,9.9,10.0,10.1,10.2,10.3,10.4,10.5,10.6,10.7,10.8,10.9,11.0,11.1,11.2,11.3,11.4,11.5,11.6,11.7,11.8,11.9,12.0,12.1,12.2,12.3,12.4,12.5,12.6,12.7,12.8,12.9,13.0,13.1,13.2,13.3,13.4,13.5,13.6,13.7,13.8,13.9,14.0,14.1,14.2,14.3,14.4,14.5,14.6,14.7,14.8,14.9,15.0,15.1,15.2,15.3,15.4,15.5,15.6,15.7,15.8,15.9,16.0,16.1,16.2,16.3,16.4,16.5,16.6,16.7,16.8,16.9,17.0,17.1,17.2,17.3,17.4,17.5,17.6,17.7,17.8,17.9,18.0,18.1,18.2,18.3,18.4,18.5,18.6,18.7,18.8,18.9,19.0,19.1,19.2,19.3,19.4,19.5,19.6,19.7,19.8,19.9,20.0,20.1,20.2,20.3,20.4,20.5,20.6,20.7,20.8,20.9,21.0,21.1,21.2,21.3,21.4,21.5,21.6,21.7,21.8,21.9,22.0,22.1,22.2,22.3,22.4,22.5,22.6,22.7,22.8,22.9,23.0,23.1,23.2,23.3,23.4,23.5,23.6,23.7,23.8,23.9,24.0,24.1,24.2,24.3,24.4,24.5,24.6,24.7,24.8,24.9,25.0,25.1,25.2,25.3,25.4,25.5,25.6,25.7,25.8,25.9,26.0,26.1,26.2,26.3,26.4,26.5,26.6,26.7,26.8,26.9,27.0,27.1,27.2,27.3,27.4,27.5,27.6,27.7,27.8,27.9,28.0,28.1,28.2,28.3,28.4,28.5,28.6,28.7,28.8,28.9,29.0,29.1,29.2,29.3,29.4,29.5,29.6,29.7,29.8,29.9,30.0],"velocities":[-5,-3,-2,-1,-0.5,-0.25,-0.13,0,0.13,0.25,0.5,1,2,3,5],"detect":{"2K|0.2":[0.108,0.148,0.199,0.358,0.598,0.712,0.364,0.05,0.391,0.729,0.605,0.362,0.201,0.148,0.109],"2K|0.5":[0.069,0.08,0.093,0.129,0.187,0.223,0.13,0.05,0.136,0.229,0.189,0.13,0.093,0.08,0.069],"6K|0.2":[0.338,0.559,0.776,0.986,1.0,1.0,0.988,0.05,0.993,1.0,1.0,0.987,0.78,0.563,0.34],"6K|0.5":[0.124,0.177,0.247,0.458,0.734,0.842,0.464,0.05,0.498,0.856,0.742,0.462,0.249,0.178,0.125]}},"B":{"transit":[{"label":"normal (r=2 mm)","v":2.0,"t":[0.0,0.2,0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.6,2.8,3.0,3.2,3.4,3.6,3.8,4.0,4.2,4.4,4.6,4.8,5.0,5.2,5.4,5.6,5.8,6.0,6.2,6.4,6.6,6.8,7.0,7.2,7.4,7.6,7.8,8.0,8.2,8.4,8.6,8.8,9.0,9.2,9.4,9.6,9.8,10.0],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.007,0.039,0.094,0.152,0.203,0.247,0.284,0.315,0.342,0.365,0.385,0.403,0.42,0.434,0.447,0.459,0.471,0.481,0.49,0.499,0.507,0.515,0.522,0.529,0.536,0.542,0.528,0.513,0.497,0.48,0.463,0.446,0.429,0.412,0.396,0.381]},{"label":"normal (r=2 mm)","v":5.0,"t":[0.0,0.2,0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.6,2.8,3.0,3.2,3.4,3.6,3.8,4.0,4.2,4.4,4.6,4.8,5.0,5.2,5.4,5.6,5.8,6.0,6.2,6.4],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.019,0.205,0.355,0.454,0.521,0.569,0.604,0.631,0.653,0.671,0.686,0.699,0.71,0.719,0.728,0.736,0.743,0.723,0.702,0.68,0.657,0.633,0.609,0.585,0.563,0.541,0.52]},{"label":"dilated (r=4 mm, grade IV)","v":2.0,"t":[0.0,0.2,0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.6,2.8,3.0,3.2,3.4,3.6,3.8,4.0,4.2,4.4,4.6,4.8,5.0,5.2,5.4,5.6,5.8,6.0,6.2,6.4,6.6,6.8,7.0,7.2,7.4,7.6,7.8,8.0,8.2,8.4,8.6,8.8,9.0,9.2,9.4,9.6,9.8,10.0],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.002,0.03,0.104,0.192,0.269,0.334,0.389,0.436,0.476,0.51,0.54,0.566,0.588,0.608,0.625,0.64,0.654,0.666,0.677,0.687,0.696,0.705,0.712,0.719,0.725,0.731,0.737,0.731,0.724,0.716,0.707,0.697,0.687,0.676,0.664,0.652,0.64]},{"label":"dilated (r=4 mm, grade IV)","v":5.0,"t":[0.0,0.2,0.4,0.6,0.8,1.0,1.2,1.4,1.6,1.8,2.0,2.2,2.4,2.6,2.8,3.0,3.2,3.4,3.6,3.8,4.0,4.2,4.4,4.6,4.8,5.0,5.2,5.4,5.6,5.8,6.0,6.2,6.4],"y":[0.0,0.0,0.0,0.0,0.0,0.0,0.039,0.26,0.423,0.534,0.612,0.669,0.711,0.743,0.768,0.787,0.803,0.815,0.826,0.835,0.842,0.849,0.855,0.847,0.839,0.83,0.819,0.808,0.796,0.783,0.77,0.756,0.743]}],"decay":[{"vol":0.5,"radius":4.9,"t":[0.0,1.9,3.8,5.7,7.7,9.6,11.5,13.4,15.3,17.2,19.2,21.1,23.0,24.9,26.8,28.7,30.7,32.6,34.5,36.4,38.3,40.2,42.1,44.1,46.0,47.9,49.8,51.7,53.6,55.6,57.5,59.4,61.3,63.2,65.1,67.1,69.0,70.9,72.8,74.7,76.6,78.5,80.5,82.4,84.3,86.2,88.1,90.0,92.0,93.9,95.8,97.7,99.6,101.5,103.5,105.4,107.3,109.2,111.1,113.0,115.0,116.9,118.8],"y":[1.0,0.841,0.775,0.725,0.683,0.648,0.616,0.587,0.561,0.537,0.515,0.494,0.474,0.456,0.439,0.423,0.408,0.393,0.38,0.367,0.354,0.343,0.332,0.321,0.311,0.301,0.292,0.283,0.275,0.267,0.259,0.252,0.244,0.238,0.231,0.225,0.219,0.213,0.207,0.202,0.196,0.191,0.186,0.182,0.177,0.173,0.169,0.164,0.16,0.157,0.153,0.149,0.146,0.142,0.139,0.136,0.133,0.13,0.127,0.124,0.121,0.118,0.116]},{"vol":1.0,"radius":6.2,"t":[0.0,1.9,3.8,5.7,7.7,9.6,11.5,13.4,15.3,17.2,19.2,21.1,23.0,24.9,26.8,28.7,30.7,32.6,34.5,36.4,38.3,40.2,42.1,44.1,46.0,47.9,49.8,51.7,53.6,55.6,57.5,59.4,61.3,63.2,65.1,67.1,69.0,70.9,72.8,74.7,76.6,78.5,80.5,82.4,84.3,86.2,88.1,90.0,92.0,93.9,95.8,97.7,99.6,101.5,103.5,105.4,107.3,109.2,111.1,113.0,115.0,116.9,118.8],"y":[1.0,0.872,0.819,0.778,0.745,0.715,0.689,0.664,0.642,0.622,0.602,0.584,0.567,0.551,0.535,0.52,0.506,0.493,0.48,0.468,0.456,0.444,0.433,0.423,0.412,0.402,0.393,0.384,0.375,0.366,0.358,0.35,0.342,0.335,0.327,0.32,0.313,0.307,0.3,0.294,0.288,0.282,0.276,0.27,0.265,0.259,0.254,0.249,0.244,0.24,0.235,0.23,0.226,0.222,0.217,0.213,0.209,0.205,0.202,0.198,0.194,0.191,0.187]},{"vol":2.0,"radius":7.8,"t":[0.0,1.9,3.8,5.7,7.7,9.6,11.5,13.4,15.3,17.2,19.2,21.1,23.0,24.9,26.8,28.7,30.7,32.6,34.5,36.4,38.3,40.2,42.1,44.1,46.0,47.9,49.8,51.7,53.6,55.6,57.5,59.4,61.3,63.2,65.1,67.1,69.0,70.9,72.8,74.7,76.6,78.5,80.5,82.4,84.3,86.2,88.1,90.0,92.0,93.9,95.8,97.7,99.6,101.5,103.5,105.4,107.3,109.2,111.1,113.0,115.0,116.9,118.8],"y":[1.0,0.897,0.854,0.821,0.793,0.769,0.747,0.727,0.708,0.691,0.675,0.659,0.645,0.631,0.617,0.604,0.592,0.58,0.569,0.558,0.547,0.537,0.527,0.517,0.507,0.498,0.489,0.48,0.472,0.464,0.456,0.448,0.44,0.433,0.425,0.418,0.411,0.405,0.398,0.392,0.385,0.379,0.373,0.367,0.361,0.355,0.35,0.344,0.339,0.334,0.329,0.324,0.319,0.314,0.309,0.305,0.3,0.296,0.291,0.287,0.283,0.278,0.274]},{"vol":5.0,"radius":10.6,"t":[0.0,1.9,3.8,5.7,7.7,9.6,11.5,13.4,15.3,17.2,19.2,21.1,23.0,24.9,26.8,28.7,30.7,32.6,34.5,36.4,38.3,40.2,42.1,44.1,46.0,47.9,49.8,51.7,53.6,55.6,57.5,59.4,61.3,63.2,65.1,67.1,69.0,70.9,72.8,74.7,76.6,78.5,80.5,82.4,84.3,86.2,88.1,90.0,92.0,93.9,95.8,97.7,99.6,101.5,103.5,105.4,107.3,109.2,111.1,113.0,115.0,116.9,118.8],"y":[1.0,0.924,0.892,0.867,0.847,0.828,0.812,0.797,0.783,0.77,0.757,0.745,0.734,0.723,0.713,0.703,0.693,0.683,0.674,0.666,0.657,0.649,0.64,0.632,0.625,0.617,0.61,0.602,0.595,0.588,0.581,0.575,0.568,0.562,0.555,0.549,0.543,0.537,0.531,0.525,0.52,0.514,0.508,0.503,0.498,0.492,0.487,0.482,0.477,0.472,0.467,0.462,0.457,0.453,0.448,0.443,0.439,0.434,0.43,0.426,0.421,0.417,0.413]}],"vols":[0.25,0.347,0.445,0.542,0.64,0.737,0.835,0.932,1.03,1.127,1.225,1.322,1.419,1.517,1.614,1.712,1.809,1.907,2.004,2.102,2.199,2.297,2.394,2.492,2.589,2.686,2.784,2.881,2.979,3.076,3.174,3.271,3.369,3.466,3.564,3.661,3.758,3.856,3.953,4.051,4.148,4.246,4.343,4.441,4.538,4.636,4.733,4.831,4.928,5.025,5.123,5.22,5.318,5.415,5.513,5.61,5.708,5.805,5.903,6.0],"mr":[2.287,1.835,1.538,1.325,1.163,1.036,0.948,0.883,0.827,0.779,0.736,0.699,0.669,0.641,0.616,0.593,0.572,0.554,0.536,0.52,0.505,0.491,0.478,0.467,0.457,0.446,0.437,0.428,0.419,0.411,0.404,0.396,0.389,0.382,0.376,0.37,0.364,0.358,0.353,0.348,0.343,0.338,0.333,0.329,0.325,0.321,0.317,0.314,0.31,0.306,0.303,0.299,0.296,0.293,0.289,0.287,0.284,0.281,0.279,0.276],"rad":[155.23,105.65,78.27,61.08,49.36,40.93,35.22,31.04,27.67,24.89,22.57,20.63,19.05,17.67,16.46,15.39,14.44,13.61,12.86,12.18,11.56,11.0,10.49,10.05,9.63,9.25,8.89,8.56,8.25,7.96,7.69,7.44,7.2,6.97,6.76,6.56,6.37,6.19,6.02,5.86,5.71,5.56,5.43,5.29,5.17,5.06,4.95,4.84,4.74,4.64,4.54,4.45,4.35,4.27,4.18,4.11,4.03,3.96,3.89,3.82]}}</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById("page-data").textContent);
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs = {}, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+  const fmt = (v, d = 2) => (Math.abs(v) < 0.005 && v !== 0 ? v.toExponential(0) : v.toFixed(d));
+
+  function legend(host, series) {
+    host.replaceChildren();
+    for (const s of series) {
+      const span = document.createElement("span");
+      const k = el("svg", { width: 18, height: 8, "aria-hidden": "true" });
+      el("line", { x1: 1, y1: 4, x2: 17, y2: 4, style: `stroke:${s.color};stroke-width:2.5;stroke-linecap:round${s.dash ? ";stroke-dasharray:" + s.dash : ""}` }, k);
+      span.appendChild(k);
+      span.appendChild(document.createTextNode(s.name));
+      host.appendChild(span);
+    }
+  }
+
+  // Minimal SVG line chart with crosshair tooltip and keyboard stepping.
+  function lineChart(host, cfg) {
+    const state = { cfg };
+    const tip = document.createElement("div");
+    tip.className = "tip"; tip.hidden = true;
+    function scale(ax, px0, px1) {
+      const f = ax.log ? Math.log10 : (v) => v;
+      const a = f(ax.min), b = f(ax.max);
+      return (v) => px0 + ((f(v) - a) / (b - a)) * (px1 - px0);
+    }
+    function draw() {
+      const c = state.cfg;
+      const W = Math.max(260, host.clientWidth);
+      const H = c.height || Math.round(Math.min(320, Math.max(220, W * 0.55)));
+      const m = { l: 48, r: 14, t: 10, b: 42 };
+      host.replaceChildren();
+      const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, tabindex: 0, role: "img", "aria-label": c.aria || "" }, host);
+      const X = scale(c.x, m.l, W - m.r), Y = scale(c.y, H - m.b, m.t);
+      for (const b of c.bands || []) {
+        const x0 = b.x0 != null ? X(b.x0) : m.l, x1 = b.x1 != null ? X(b.x1) : W - m.r;
+        const y0 = b.y0 != null ? Y(b.y0) : H - m.b, y1 = b.y1 != null ? Y(b.y1) : m.t;
+        el("rect", { x: Math.min(x0, x1), y: Math.min(y0, y1), width: Math.abs(x1 - x0), height: Math.abs(y1 - y0), style: `fill:${b.fill};opacity:${b.opacity ?? 0.14}` }, svg);
+        if (b.label) { const t = el("text", { x: Math.min(x0, x1) + 4, y: Math.min(y0, y1) + 12 }, svg); t.textContent = b.label; }
+      }
+      for (const v of c.y.ticks) {
+        el("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), style: "stroke:var(--grid);stroke-width:1" }, svg);
+        const t = el("text", { x: m.l - 6, y: Y(v) + 3.5, "text-anchor": "end" }, svg);
+        t.textContent = (c.y.fmt || String)(v);
+      }
+      for (const v of c.x.ticks) {
+        const t = el("text", { x: X(v), y: H - m.b + 15, "text-anchor": "middle" }, svg);
+        t.textContent = (c.x.fmt || String)(v);
+      }
+      el("line", { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, style: "stroke:var(--rule);stroke-width:1" }, svg);
+      for (const v of c.vlines || []) el("line", { x1: X(v), x2: X(v), y1: m.t, y2: H - m.b, style: "stroke:var(--rule);stroke-width:1" }, svg);
+      for (const h of c.hlines || []) el("line", { x1: m.l, x2: W - m.r, y1: Y(h), y2: Y(h), style: "stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3" }, svg);
+      const xl = el("text", { x: (m.l + W - m.r) / 2, y: H - 6, "text-anchor": "middle", class: "axis-label" }, svg); xl.textContent = c.x.label;
+      const yl = el("text", { x: 12, y: (m.t + H - m.b) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(m.t + H - m.b) / 2})`, class: "axis-label" }, svg); yl.textContent = c.y.label;
+      for (const s of c.series) {
+        let d = "", pen = false;
+        s.xs.forEach((x, i) => {
+          const y = s.ys[i];
+          const ok = Number.isFinite(y) && (!c.y.log || y > 0) && (!c.x.log || x > 0);
+          if (!ok) { pen = false; return; }
+          const yc = Math.min(Math.max(y, c.y.min), c.y.max);
+          d += `${pen ? "L" : "M"}${X(x).toFixed(1)},${Y(yc).toFixed(1)}`;
+          pen = true;
+        });
+        el("path", { d, style: `fill:none;stroke:${s.color};stroke-width:${s.w || 2};stroke-linejoin:round;stroke-linecap:round${s.dash ? ";stroke-dasharray:" + s.dash : ""}` }, svg);
+        if (s.markers) s.xs.forEach((x, i) => {
+          const y = s.ys[i];
+          if (!Number.isFinite(y) || (c.y.log && y <= 0)) return;
+          el("circle", { cx: X(x), cy: Y(Math.min(Math.max(y, c.y.min), c.y.max)), r: 3.5, style: `fill:${s.color};stroke:var(--surface);stroke-width:2` }, svg);
+        });
+      }
+      // hover layer
+      const cross = el("line", { y1: m.t, y2: H - m.b, style: "stroke:var(--ink-2);stroke-width:1;opacity:0" }, svg);
+      const dots = c.series.map((s) => el("circle", { r: 4, style: `fill:${s.color};stroke:var(--surface);stroke-width:2;opacity:0` }, svg));
+      const ref = c.series[0].xs;
+      const nearest = (xs, xv) => {
+        let lo = 0, hi = xs.length - 1;
+        while (hi - lo > 1) { const mid = (lo + hi) >> 1; (xs[mid] < xv ? (lo = mid) : (hi = mid)); }
+        return Math.abs(xs[lo] - xv) <= Math.abs(xs[hi] - xv) ? lo : hi;
+      };
+      const invert = (px) => {
+        const f = c.x.log ? Math.log10 : (v) => v, a = f(c.x.min), b = f(c.x.max);
+        const v = a + ((px - m.l) / (W - m.l - m.r)) * (b - a);
+        return c.x.log ? 10 ** v : v;
+      };
+      state.idx = state.idx ?? null;
+      function show(i) {
+        state.idx = i;
+        const xv = ref[i];
+        cross.setAttribute("x1", X(xv)); cross.setAttribute("x2", X(xv)); cross.style.opacity = 0.5;
+        tip.replaceChildren();
+        const hx = document.createElement("div"); hx.className = "tx";
+        hx.textContent = (c.x.tipFmt || c.x.fmt || String)(xv); tip.appendChild(hx);
+        c.series.forEach((s, k) => {
+          const j = nearest(s.xs, xv), y = s.ys[j];
+          const okY = Number.isFinite(y) && (!c.y.log || y > 0);
+          dots[k].style.opacity = okY ? 1 : 0;
+          if (okY) { dots[k].setAttribute("cx", X(s.xs[j])); dots[k].setAttribute("cy", Y(Math.min(Math.max(y, c.y.min), c.y.max))); }
+          const row = document.createElement("div"); row.className = "row";
+          const key = el("svg", { width: 14, height: 6 });
+          el("line", { x1: 1, y1: 3, x2: 13, y2: 3, style: `stroke:${s.color};stroke-width:2.5${s.dash ? ";stroke-dasharray:" + s.dash : ""}` }, key);
+          const b = document.createElement("b"); b.textContent = okY ? (c.y.tipFmt || fmt)(y) : "–";
+          const nm = document.createElement("span"); nm.textContent = s.name;
+          row.append(key, b, nm); tip.appendChild(row);
+        });
+        tip.hidden = false;
+        const px = X(xv), tw = tip.offsetWidth;
+        tip.style.left = `${px + 12 + tw > W ? px - tw - 12 : px + 12}px`;
+        tip.style.top = `${m.t}px`;
+      }
+      function hide() { tip.hidden = true; cross.style.opacity = 0; dots.forEach((d) => (d.style.opacity = 0)); }
+      svg.addEventListener("pointermove", (e) => {
+        const r = svg.getBoundingClientRect();
+        const px = ((e.clientX - r.left) / r.width) * W;
+        if (px < m.l || px > W - m.r) return hide();
+        show(nearest(ref, invert(px)));
+      });
+      svg.addEventListener("pointerleave", hide);
+      svg.addEventListener("blur", hide);
+      svg.addEventListener("keydown", (e) => {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        const step = Math.max(1, Math.round(ref.length / 40));
+        const i = state.idx == null ? 0 : state.idx + (e.key === "ArrowRight" ? step : -step);
+        show(Math.max(0, Math.min(ref.length - 1, i)));
+      });
+      host.appendChild(tip);
+    }
+    let w = 0;
+    new ResizeObserver(() => { if (host.clientWidth !== w) { w = host.clientWidth; draw(); } }).observe(host);
+    draw();
+    return { update(next) { state.cfg = next; state.idx = null; draw(); } };
+  }
+
+  // ---------------- flow dial ----------------
+  const A = D.A, vels = A.velocities;
+  const S_K = { name: "kidney-side voxel", color: "var(--s2)" };
+  const S_B = { name: "bladder-side voxel", color: "var(--s1)" };
+  const S_F = { name: "heated spot", color: "var(--s-neutral)", dash: "4 3", w: 1.5 };
+  let gain = 1;
+  const velIn = document.getElementById("vel");
+  legend(document.getElementById("dial-legend"), [S_K, S_B, S_F]);
+
+  function dialCfg() {
+    const v = vels[+velIn.value], tr = A.traces[String(v)];
+    const sc = (a) => a.map((y) => y * gain);
+    // fit the axis to this velocity's traces so small downstream signals stay readable
+    const peak = Math.max(...tr.kidney, ...tr.bladder, ...tr.focus) * gain;
+    const steps = [0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8];
+    const top = steps.find((s) => s >= peak * 1.08) || 9;
+    const tick = top <= 0.5 ? 0.1 : top <= 1 ? 0.25 : top <= 2 ? 0.5 : top <= 4 ? 1 : 2;
+    const yt = []; for (let y = 0; y <= top + 1e-9; y += tick) yt.push(+y.toFixed(2));
+    return {
+      aria: `Temperature traces at ${v} cm/s`,
+      x: { min: 0, max: 30, ticks: [0, 5, 10, 15, 20, 25, 30], label: "time (s)", tipFmt: (t) => `t = ${t.toFixed(1)} s` },
+      y: { min: 0, max: top, ticks: yt, label: "ΔT (K)", fmt: (y) => y.toString(), tipFmt: (y) => `${y.toFixed(3)} K` },
+      bands: [{ x0: 0, x1: 5, fill: "var(--s2)", opacity: 0.08, label: "heating" }],
+      series: [
+        { ...S_K, xs: A.t, ys: sc(tr.kidney) },
+        { ...S_B, xs: A.t, ys: sc(tr.bladder) },
+        { ...S_F, xs: A.t, ys: sc(tr.focus) },
+      ],
+    };
+  }
+  const dialChart = lineChart(document.getElementById("dial-chart"), dialCfg());
+
+  function schematic() {
+    const v = vels[+velIn.value], tr = A.traces[String(v)];
+    const kMax = Math.max(...tr.kidney) * gain, bMax = Math.max(...tr.bladder) * gain;
+    const host = document.getElementById("schematic");
+    host.replaceChildren();
+    const W = 440, H = 190, cy = 96, x0 = 30, x1 = 410, cx = 220, off = 95; // 10 mm = 95 px
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, "aria-hidden": "true" }, host);
+    const defs = el("defs", {}, svg);
+    const dirSign = v > 0 ? 1 : v < 0 ? -1 : 0;
+    const g = el("linearGradient", { id: "plume", x1: dirSign >= 0 ? 0 : 1, x2: dirSign >= 0 ? 1 : 0, y1: 0, y2: 0 }, defs);
+    el("stop", { offset: "0%", style: "stop-color:var(--s2);stop-opacity:.85" }, g);
+    el("stop", { offset: "100%", style: "stop-color:var(--s2);stop-opacity:0" }, g);
+    const rg = el("radialGradient", { id: "spot" }, defs);
+    el("stop", { offset: "0%", style: "stop-color:var(--s2);stop-opacity:.9" }, rg);
+    el("stop", { offset: "100%", style: "stop-color:var(--s2);stop-opacity:0" }, rg);
+    // tissue band and ureter
+    el("rect", { x: x0, y: cy - 46, width: x1 - x0, height: 92, rx: 10, style: "fill:var(--bg);stroke:var(--rule)" }, svg);
+    el("rect", { x: x0, y: cy - 20, width: x1 - x0, height: 40, rx: 20, style: "fill:var(--surface);stroke:var(--ink-2);stroke-width:1.2" }, svg);
+    // plume
+    const strength = Math.min(1, Math.max(kMax, bMax) / (0.5 * gain) + 0.15);
+    if (dirSign !== 0) {
+      const len = 150 + 30 * Math.min(1, Math.abs(v) / 2);
+      const px = dirSign > 0 ? cx : cx - len;
+      el("rect", { class: "plume", x: px, y: cy - 16, width: len, height: 32, rx: 16, fill: "url(#plume)", style: `opacity:${strength}` }, svg);
+    }
+    el("circle", { cx, cy, r: dirSign === 0 ? 30 : 20, fill: "url(#spot)" }, svg);
+    // voxels
+    for (const [x, side, val] of [[cx - off, "bladder-side", bMax], [cx + off, "kidney-side", kMax]]) {
+      const hot = val > 0.02;
+      el("rect", { x: x - 11, y: cy - 11, width: 22, height: 22, rx: 3, style: `fill:none;stroke:${side === "kidney-side" ? "var(--s2)" : "var(--s1)"};stroke-width:${hot ? 2.5 : 1.5}` }, svg);
+      const t = el("text", { x, y: cy + 62, "text-anchor": "middle", style: "font:600 12px var(--f-mono);fill:var(--ink)" }, svg);
+      t.textContent = `+${val < 0.001 ? "0.000" : val.toFixed(3)} K`;
+      const t2 = el("text", { x, y: cy + 77, "text-anchor": "middle", style: "font:11px var(--f-mono);fill:var(--muted)" }, svg);
+      t2.textContent = side;
+    }
+    // ends
+    const lb = el("text", { x: x0, y: 22, style: "font:600 12px var(--f-mono);fill:var(--s1)" }, svg); lb.textContent = "← bladder";
+    const lk = el("text", { x: x1, y: 22, "text-anchor": "end", style: "font:600 12px var(--f-mono);fill:var(--s2)" }, svg); lk.textContent = "kidney →";
+    // flow arrow
+    if (dirSign !== 0) {
+      const ay = 36, ax0 = dirSign > 0 ? cx - 50 : cx + 50, ax1 = dirSign > 0 ? cx + 50 : cx - 50;
+      el("line", { x1: ax0, y1: ay, x2: ax1, y2: ay, style: "stroke:var(--ink);stroke-width:1.5" }, svg);
+      el("path", { d: `M${ax1},${ay} l${-8 * dirSign},-4 l0,8 z`, style: "fill:var(--ink)" }, svg);
+      const ft = el("text", { x: cx, y: ay - 7, "text-anchor": "middle", style: "font:11px var(--f-mono);fill:var(--ink-2)" }, svg);
+      ft.textContent = `urine ${Math.abs(v)} cm/s`;
+    } else {
+      const ft = el("text", { x: cx, y: 36, "text-anchor": "middle", style: "font:11px var(--f-mono);fill:var(--ink-2)" }, svg);
+      ft.textContent = "urine still";
+    }
+  }
+
+  function readout() {
+    const v = vels[+velIn.value];
+    const r = document.getElementById("readout");
+    r.replaceChildren();
+    const dir = document.createElement("span");
+    dir.className = "dir " + (v > 0 ? "reflux" : v < 0 ? "ante" : "");
+    dir.textContent = v > 0 ? "Reflux" : v < 0 ? "Antegrade" : "No flow";
+    r.appendChild(dir);
+    r.appendChild(document.createTextNode(
+      v === 0 ? " · neither voxel warms" : ` · ${Math.abs(v)} cm/s · only the ${v > 0 ? "kidney" : "bladder"}-side voxel warms`));
+    velIn.setAttribute("aria-valuetext", `${v} centimetres per second, ${dir.textContent}`);
+  }
+  function updateDial() { readout(); schematic(); dialChart.update(dialCfg()); }
+  velIn.addEventListener("input", updateDial);
+  for (const [id, g] of [["gain-2", 1], ["gain-6", 3]]) {
+    document.getElementById(id).addEventListener("click", () => {
+      gain = g;
+      document.getElementById("gain-2").setAttribute("aria-pressed", String(g === 1));
+      document.getElementById("gain-6").setAttribute("aria-pressed", String(g === 3));
+      updateDial();
+    });
+  }
+  updateDial();
+
+  // ---------------- wash-out ----------------
+  const peaks = (key) => vels.map((v) => Math.max(...A.traces[String(v)][key]));
+  const washS = [
+    { ...S_K, name: "kidney-side voxel", xs: vels, ys: peaks("kidney"), markers: true },
+    { ...S_B, name: "bladder-side voxel", xs: vels, ys: peaks("bladder"), markers: true },
+    { ...S_F, name: "heated-spot voxel", xs: vels, ys: peaks("focus"), markers: true },
+  ];
+  legend(document.getElementById("wash-legend"), washS);
+  lineChart(document.getElementById("wash-chart"), {
+    aria: "Peak temperature rise against urine velocity",
+    x: { min: -5, max: 5, ticks: [-5, -3, -1, 0, 1, 3, 5], label: "velocity (cm/s): − antegrade, + reflux", tipFmt: (v) => `${v} cm/s` },
+    y: { min: 0, max: 2.1, ticks: [0, 0.5, 1, 1.5, 2], label: "peak ΔT (K)", tipFmt: (y) => `${y.toFixed(3)} K` },
+    vlines: [0], series: washS,
+  });
+
+  // ---------------- detection ----------------
+  const pos = vels.map((v, i) => [v, i]).filter(([v]) => v > 0);
+  const detS = [
+    { key: "6K|0.2", name: "+6 K pulse, σ 0.2 K", color: "var(--s1)" },
+    { key: "6K|0.5", name: "+6 K pulse, σ 0.5 K", color: "var(--s2)" },
+    { key: "2K|0.2", name: "+2 K pulse, σ 0.2 K", color: "var(--s1)", dash: "5 4" },
+    { key: "2K|0.5", name: "+2 K pulse, σ 0.5 K", color: "var(--s2)", dash: "5 4" },
+  ].map((s) => ({ ...s, xs: pos.map(([v]) => v), ys: pos.map(([, i]) => A.detect[s.key][i]), markers: true }));
+  legend(document.getElementById("det-legend"), detS);
+  lineChart(document.getElementById("det-chart"), {
+    aria: "Probability of a correct direction call against velocity",
+    x: { min: 0.1, max: 6, log: true, ticks: [0.13, 0.25, 0.5, 1, 2, 5], label: "reflux velocity (cm/s, log)", tipFmt: (v) => `${v} cm/s` },
+    y: { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1], label: "P(correct)", fmt: (y) => `${Math.round(y * 100)}%`, tipFmt: (y) => `${Math.round(y * 100)}%` },
+    hlines: [0.9], series: detS,
+  });
+  const tbl = document.getElementById("det-table");
+  const thead = tbl.createTHead().insertRow();
+  ["Velocity", ...detS.map((s) => s.name)].forEach((h) => { const th = document.createElement("th"); th.textContent = h; thead.appendChild(th); });
+  const tb = tbl.createTBody();
+  pos.forEach(([v, i]) => {
+    const r = tb.insertRow();
+    const c0 = r.insertCell(); c0.className = "n"; c0.textContent = `${v} cm/s`;
+    detS.forEach((s) => { const c = r.insertCell(); c.className = "n"; c.textContent = `${Math.round(A.detect[s.key][i] * 100)}%`; });
+  });
+
+  // ---------------- pulse ----------------
+  const pS = [
+    { ...S_K, xs: A.pulse_t, ys: A.pulse.kidney },
+    { ...S_B, xs: A.pulse_t, ys: A.pulse.bladder },
+    { ...S_F, xs: A.pulse_t, ys: A.pulse.focus },
+  ];
+  legend(document.getElementById("pulse-legend"), pS);
+  lineChart(document.getElementById("pulse-chart"), {
+    aria: "Temperature traces for a transient reflux jet",
+    height: 260,
+    x: { min: 0, max: 30, ticks: [0, 5, 10, 15, 20, 25, 30], label: "time (s)", tipFmt: (t) => `t = ${t.toFixed(1)} s` },
+    y: { min: 0, max: 1.8, ticks: [0, 0.5, 1, 1.5], label: "ΔT (K)", tipFmt: (y) => `${y.toFixed(3)} K` },
+    bands: [{ x0: 0, x1: 4, fill: "var(--s2)", opacity: 0.07, label: "heating" }, { x0: 4, x1: 6, fill: "var(--accent)", opacity: 0.14, label: "jet" }],
+    series: pS,
+  });
+
+  // ---------------- protocol B ----------------
+  const B = D.B;
+  const trS = B.transit.map((r) => ({
+    name: `${r.label.startsWith("dilated") ? "dilated 4 mm" : "normal 2 mm"}, ${r.v} cm/s`,
+    color: r.label.startsWith("dilated") ? "var(--s2)" : "var(--s1)", dash: r.v < 3 ? "5 4" : "",
+    xs: r.t, ys: r.y,
+  }));
+  legend(document.getElementById("tr-legend"), trS);
+  lineChart(document.getElementById("tr-chart"), {
+    aria: "Fraction of bladder offset arriving at the renal pelvis",
+    x: { min: 0, max: 10, ticks: [0, 2, 4, 6, 8, 10], label: "time since reflux starts (s)", tipFmt: (t) => `t = ${t.toFixed(1)} s` },
+    y: { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1], label: "fraction of offset", fmt: (y) => `${Math.round(y * 100)}%`, tipFmt: (y) => `${Math.round(y * 100)}%` },
+    series: trS,
+  });
+  const ramp = ["var(--q1)", "var(--q2)", "var(--q3)", "var(--q4)"];
+  const dcS = B.decay.map((d, i) => ({ name: `${d.vol} mL`, color: ramp[i], xs: d.t, ys: d.y }));
+  legend(document.getElementById("dc-legend"), dcS);
+  lineChart(document.getElementById("dc-chart"), {
+    aria: "Decay of pooled refluxed urine temperature",
+    x: { min: 0, max: 120, ticks: [0, 30, 60, 90, 120], label: "time after arrival (s)", tipFmt: (t) => `t = ${Math.round(t)} s` },
+    y: { min: 0, max: 1, ticks: [0, 0.25, 0.5, 0.75, 1], label: "fraction remaining", fmt: (y) => `${Math.round(y * 100)}%`, tipFmt: (y) => `${Math.round(y * 100)}%` },
+    vlines: [15], series: dcS,
+  });
+  const ndS = [
+    { name: "MR thermometry", color: "var(--s1)", xs: B.vols, ys: B.mr },
+    { name: "microwave radiometry", color: "var(--s2)", xs: B.vols, ys: B.rad },
+  ];
+  legend(document.getElementById("nd-legend"), ndS);
+  lineChart(document.getElementById("nd-chart"), {
+    aria: "Bladder temperature offset needed for detection against refluxed volume",
+    x: { min: 0, max: 6, ticks: [0, 1, 2, 3, 4, 5, 6], label: "refluxed volume (mL)", tipFmt: (v) => `${v.toFixed(2)} mL` },
+    y: { min: 0.2, max: 200, log: true, ticks: [0.3, 1, 3, 10, 30, 100], label: "offset needed (K, log)", tipFmt: (y) => `${y < 10 ? y.toFixed(2) : Math.round(y)} K` },
+    bands: [{ y0: 0.2, y1: 4, fill: "var(--ok)", opacity: 0.1, label: "±4 K fill" }],
+    series: ndS,
+  });
+})();
+</script>
