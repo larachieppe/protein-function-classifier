@@ -43,6 +43,11 @@ PAGE: dict = {}  # compact chart data inlined into thermal_reflux_tracer.html
 def _r(a, nd=4):
     return [round(float(x), nd) for x in a]
 
+
+def _k(x):
+    """Number as JavaScript's String() writes it (0.0 -> '0', -2.5 -> '-2.5')."""
+    return "%g" % x
+
 # ---------------------------------------------------------------- material values
 # Urine ~ water. Tissue ~ generic retroperitoneal soft tissue (muscle/fat mix).
 URINE = dict(k=0.60, rho_c=1000 * 4180, perf=0.0)
@@ -169,24 +174,31 @@ def voxel_mean(z_center, half_len=1.0e-3, r_lim=2.0e-3):
     """Mean temperature in a ~2x2x2 mm thermometry voxel centred on the ureter."""
     def fn(T, r, z):
         rm = r < r_lim
-        zm = np.abs(z - z_center) <= half_len
+        zm = np.abs(z - z_center) <= half_len + 1e-9  # include both edge cells symmetrically
         w = r[rm][:, None] * np.ones(zm.sum())[None, :]
         return float((T[np.ix_(rm, zm)] * w).sum() / w.sum())
     return fn
 
 
 # =============================================================== Experiment A
-def experiment_a(geo=Ureter()):
-    """Heat a 1.5-mm focal spot for 5 s, read voxels 10 mm kidney-side and bladder-side."""
+STEADY_REF: dict = {}  # steady-flow comparison values from experiment A, used by experiment C
+SENSORS = {"kidney": voxel_mean(+10e-3), "bladder": voxel_mean(-10e-3), "focus": voxel_mean(0.0)}
+
+
+def focal_source(geo: Ureter):
+    """1.5-mm Gaussian focal spot at z=0, scaled so the focal voxel peaks at +2 K after
+    5 s with a still, urine-filled lumen (sub-hyperthermic)."""
     r, z, _, _ = build_grid(geo, -40e-3, 40e-3)
     sigma = 1.5e-3
     Q_unit = 1e6 * np.exp(-(r[:, None] ** 2 + z[None, :] ** 2) / (2 * sigma**2))
-    sensors = {"kidney": voxel_mean(+10e-3), "bladder": voxel_mean(-10e-3), "focus": voxel_mean(0.0)}
+    cal = simulate(geo, 0.0, 30.0, source=(Q_unit, 0.0, 5.0), record=SENSORS)
+    return Q_unit * (2.0 / cal["samples"]["focus"].max())
 
-    # Calibrate power so the focal voxel peaks at +2 K with no flow (sub-hyperthermic).
-    cal = simulate(geo, 0.0, 30.0, source=(Q_unit, 0.0, 5.0), record=sensors)
-    scale = 2.0 / cal["samples"]["focus"].max()
-    Q = Q_unit * scale
+
+def experiment_a(geo=Ureter()):
+    """Heat a 1.5-mm focal spot for 5 s, read voxels 10 mm kidney-side and bladder-side."""
+    sensors = SENSORS
+    Q = focal_source(geo)
 
     velocities_cm = [-5, -3, -2, -1, -0.5, -0.25, -0.13, 0, 0.13, 0.25, 0.5, 1, 2, 3, 5]
     runs = {}
@@ -223,6 +235,7 @@ def experiment_a(geo=Ureter()):
             detect[(g_name, s)] = row
 
     plot_a(runs, velocities_cm, detect, geo)
+    STEADY_REF["bladder_peak_0.13"] = float(runs[-0.13]["samples"]["bladder"].max())
     sub = slice(0, None, 2)  # 0.2 s
     PAGE["A"] = dict(
         t=_r(runs[0]["t"][sub], 2),
@@ -323,6 +336,273 @@ def plot_a(runs, velocities_cm, detect, geo):
     ax.legend(fontsize=8)
     fig.tight_layout()
     fig.savefig(OUT / "fig_a_pulse.png", dpi=130)
+    plt.close(fig)
+
+
+# =============================================================== Experiment C
+@dataclass
+class Peristalsis:
+    """Antegrade peristalsis: between contractions the lumen is collapsed (no urine, no
+    flow); urine moves only as discrete boluses carried rigidly by the contraction wave.
+
+    Typical human values: 2-6 contractions/min, wave speed 2-6 cm/s, bolus 0.1-0.5 mL
+    (at ~1 mL/min urine output and 4/min, ~0.25 mL, i.e. ~2 cm of a 2-mm-radius lumen).
+    """
+    period: float = 15.0            # s between boluses (4/min)
+    wave_speed: float = 0.03        # m/s, bolus travels towards the bladder (-z)
+    bolus_volume: float = 0.25e-6   # m^3
+    first_arrival: float = 0.0      # s, when the first bolus centre crosses z = 0
+    mixing: float = 1.0             # conductivity multiplier in the bolus (internal recirculation)
+
+
+def simulate_peristaltic(geo: Ureter, per: Peristalsis, t_end: float, source=None, record=None,
+                         reflux=None, z_range=(-40e-3, 40e-3)):
+    """Same Pennes/advection physics as `simulate`, but the lumen opens and closes.
+
+    Collapsed lumen cells stand for wall tissue folded inward: they take wall properties
+    and do not move. Bolus cells hold urine and are translated rigidly one cell towards the
+    bladder every dz/c seconds. Opening and collapse conserve energy: when a bolus opens a
+    column, the heat in its collapsed lumen cells moves out into the wall rows (the wall is
+    pushed outward); when a column collapses, its lumen cells take the mucosal temperature
+    and that heat is taken back out of the wall rows. Urine entering from the kidney end is
+    at body temperature.
+
+    reflux: optional (t_on, t_off, velocity). From t_on the whole lumen is distended and
+            urine-filled; during [t_on, t_off) it carries retrograde Poiseuille flow from
+            the bladder end (body temperature); boluses stop once the ureter is full.
+    """
+    r, z, lumen, p = build_grid(geo, *z_range)
+    nr, nz = len(r), len(z)
+    dr, dz = geo.dr, geo.dz
+    wall0 = int(np.argmax(~lumen))                       # first wall row (mucosa)
+    nl = int(lumen.sum())
+    wall_rows = (r >= geo.radius) & (r < geo.radius + geo.wall)
+    c_lum = WALL["rho_c"] * r[:nl]                        # heat capacity per lumen cell (∝ r dr dz)
+    c_wall = WALL["rho_c"] * r[wall_rows]
+
+    def to_wall(j, energy):
+        """Spread `energy` (in rho_c*r*K units) uniformly in temperature over the wall rows."""
+        T[wall_rows, j] += energy / c_wall.sum()
+    L_cells = max(1, int(round(per.bolus_volume / (np.pi * geo.radius**2) / dz)))
+    i0 = int(np.argmin(np.abs(z)))                        # cell at z = 0
+
+    k_base, rc_base, perf_base = (np.repeat(p[n][:, None], nz, axis=1) for n in ("k", "rho_c", "perf"))
+    profile = np.where(lumen, 2.0 * (1 - (r / geo.radius) ** 2), 0.0)[:, None]
+
+    alpha_max = max(URINE["k"] * per.mixing / URINE["rho_c"], (p["k"] / p["rho_c"]).max())
+    dt_diff = 0.2 / (alpha_max * (1 / dr**2 + 1 / dz**2))
+    dt_shift = dz / per.wave_speed
+    dt_cfl = 0.5 * dz / (2 * abs(reflux[2])) if reflux else np.inf
+    m = int(np.ceil(dt_shift / min(dt_diff, dt_cfl)))
+    dt = dt_shift / m
+    n_steps = int(np.ceil(t_end / dt))
+
+    # boluses whose centre crosses z=0 at t_k; include ones already in the domain at t=0
+    span = (z_range[1] - z_range[0]) / per.wave_speed
+    ks = range(int(np.floor((-per.first_arrival - span) / per.period)) - 1,
+               int(np.ceil((t_end - per.first_arrival + span) / per.period)) + 1)
+    t_k = [per.first_arrival + k * per.period for k in ks]
+
+    def centre_idx(n, tk):
+        # integer shift count: the bolus advances exactly one cell every m steps
+        return i0 - int(np.floor((n * dt - tk) / dt_shift + 0.5))
+
+    def occupancy(n):
+        occ = np.zeros(nz, bool)
+        for tk in t_k:
+            lo = centre_idx(n, tk) - L_cells // 2
+            a, b = max(lo, 0), min(lo + L_cells, nz)
+            if a < b:
+                occ[a:b] = True
+        return occ
+
+    T = np.zeros((nr, nz))
+    samples = {name: [] for name in (record or {})}
+    times, occ_log = [], []
+    next_sample = 0.0
+    full = False
+    occ = occupancy(0)
+    for n in range(n_steps + 1):
+        t = n * dt
+        if reflux and not full and t >= reflux[0]:
+            full = True                                   # reflux column distends the ureter
+        if record and t >= next_sample - 1e-9:
+            next_sample += 0.1
+            times.append(t)
+            occ_log.append(np.ones(nz, bool) if full else occ.copy())
+            for name, fn in record.items():
+                samples[name].append(fn(T, r, z))
+        if n == n_steps:
+            break
+
+        # move boluses (rigid translation by one cell towards the bladder)
+        if not full:
+            new_occ = occupancy(n)
+            if n > 0:
+                for tk in t_k:
+                    c_old, c_new = centre_idx(n - 1, tk), centre_idx(n, tk)
+                    if c_new == c_old:
+                        continue
+                    lo, hi = c_old - L_cells // 2, c_old - L_cells // 2 + L_cells - 1
+                    if hi < 0 or lo - 1 > nz - 1:
+                        continue
+                    front = lo - 1
+                    if 0 <= front <= nz - 1 and not occ[front]:
+                        to_wall(front, (c_lum * T[:nl, front]).sum())   # folded wall moves outward
+                    old = T[:nl].copy()
+                    for j_new in range(max(lo - 1, 0), min(hi - 1, nz - 1) + 1):
+                        j_src = j_new + 1
+                        T[:nl, j_new] = old[:, j_src] if j_src <= nz - 1 else 0.0
+                    if 0 <= hi <= nz - 1 and not new_occ[hi]:
+                        T[:nl, hi] = T[wall0, hi]         # collapsed again: wall folds inward
+                        to_wall(hi, -(c_lum * T[:nl, hi]).sum())
+            occ = new_occ
+
+        open_z = np.ones(nz, bool) if full else occ
+        k = k_base.copy(); rc = rc_base.copy(); W = perf_base.copy()
+        closed = ~open_z
+        k[:nl][:, closed] = WALL["k"]; rc[:nl][:, closed] = WALL["rho_c"]; W[:nl][:, closed] = WALL["perf"]
+        k[:nl][:, open_z] = URINE["k"] * (1.0 if full else per.mixing)
+        W = W * RHO_C_BLOOD
+
+        k_face = 0.5 * (k[1:] + k[:-1])
+        r_face = (r[:-1] + 0.5 * dr)[:, None]
+        flux_r = r_face * k_face * (T[1:] - T[:-1]) / dr
+        div_r = np.zeros_like(T)
+        div_r[:-1] += flux_r
+        div_r[1:] -= flux_r
+        div_r[-1] += (r[-1] + dr / 2) * k[-1] * (0 - T[-1]) / (dr / 2)
+        div_r /= r[:, None] * dr
+
+        u_now = reflux[2] if (reflux and reflux[0] <= t < reflux[1]) else 0.0
+        left = np.zeros(nr)
+        right = T[:, -1] if u_now > 0 else np.zeros(nr)
+        Tp = np.concatenate([left[:, None], T, right[:, None]], axis=1)
+        kz_face = 0.5 * (np.concatenate([k[:, :1], k], 1)[:, :-1] + k), 0.5 * (k + np.concatenate([k, k[:, -1:]], 1)[:, 1:])
+        lap_z = (kz_face[1] * (Tp[:, 2:] - T) - kz_face[0] * (T - Tp[:, :-2])) / dz**2
+        adv = -(u_now * profile) * (T - Tp[:, :-2]) / dz if u_now > 0 else 0.0
+
+        rhs = (div_r + lap_z - W * T) / rc + adv
+        if source is not None and source[1] <= t < source[2]:
+            rhs += source[0] / rc
+        T = T + dt * rhs
+
+    return dict(t=np.array(times), samples={k_: np.array(v) for k_, v in samples.items()},
+                occ=np.array(occ_log), z=z)
+
+
+def experiment_c(geo=Ureter()):
+    """Protocol A again, but in a realistically peristaltic ureter."""
+    Q = focal_source(geo)
+    src = (Q, 0.0, 5.0)
+    phases = [-2.5, 0.0, 2.5, 5.0, 7.5, 10.0]      # first bolus centre crosses the spot at t = phase
+    # 30 frames at 1 Hz. A bolus crosses a voxel in well under a second, so each frame is
+    # modelled as the average over its 1-s acquisition (as MR thermometry integrates),
+    # not a point sample. Bolus timing is unknown, so the whole 30 s is used.
+    N = 30
+    runs, summary = {}, {}
+    for mix in (1.0, 5.0):
+        for ph in phases:
+            res = simulate_peristaltic(geo, Peristalsis(first_arrival=ph, mixing=mix), 30.0,
+                                       source=src, record=SENSORS)
+            runs[(mix, ph)] = res
+            sm = res["samples"]
+            D = (sm["bladder"][:300] - sm["kidney"][:300]).mean()       # antegrade: bladder side
+            above = sm["bladder"] > 0.5 * sm["bladder"].max()
+            summary[(mix, ph)] = dict(
+                bladder_peak=float(sm["bladder"].max()), kidney_peak=float(sm["kidney"].max()),
+                focus_peak=float(sm["focus"].max()), D=float(D),
+                t_bladder_peak=float(res["t"][np.argmax(sm["bladder"])]),
+                bladder_mean_30s=float(sm["bladder"][:300].mean()),
+                bladder_time_above_half_peak_s=float(above.sum() * 0.1))
+            print(f"  C: mixing x{mix:.0f} phase {ph:+5.1f} s  bladder peak={sm['bladder'].max():.3f} K "
+                  f"at t={res['t'][np.argmax(sm['bladder'])]:.1f} s  kidney={sm['kidney'].max():.4f}")
+
+    # Reflux during voiding into a ureter that was collapsed while it was heated:
+    # 2 s jet at 3 cm/s starting at t = 4 s (same timing as the open-lumen pulse case).
+    rfx = simulate_peristaltic(geo, Peristalsis(first_arrival=20.0), 30.0, source=src,
+                               record=SENSORS, reflux=(4.0, 6.0, 0.03))
+    print(f"  C: reflux jet into collapsed ureter  kidney peak={rfx['samples']['kidney'].max():.3f} K  "
+          f"bladder={rfx['samples']['bladder'].max():.4f}")
+
+    det = {}
+    for gname, g in (("2K", 1.0), ("6K", 3.0)):
+        for sig in (0.2, 0.5):
+            sd = sig * np.sqrt(2 / N)
+            for mix in (1.0, 5.0):
+                p_ = [norm.cdf(g * summary[(mix, ph)]["D"] / sd - norm.ppf(0.95)) for ph in phases]
+                det[f"{gname}|{sig}|x{mix:.0f}"] = float(np.mean(p_))
+    print("  C: P(correct antegrade call, averaged over bolus timing):",
+          {k_: round(v, 2) for k_, v in det.items()})
+
+    plot_c(runs, rfx, phases, summary)
+    sub = slice(0, None, 2)
+    PAGE["C"] = dict(
+        steady_ref=round(STEADY_REF.get("bladder_peak_0.13", 0.0), 4),
+        t=_r(runs[(1.0, 0.0)]["t"][sub], 2), phases=phases,
+        traces={f"{mix:.0f}|{_k(ph)}": {k_: _r(runs[(mix, ph)]["samples"][k_][sub]) for k_ in ("kidney", "bladder", "focus")}
+                for (mix, ph) in runs},
+        bolus={_k(ph): [[round(float(z_), 4) for z_ in _bolus_extent(runs[(1.0, ph)], i)] for i in range(0, 301, 2)]
+               for ph in phases},
+        reflux={k_: _r(rfx["samples"][k_]) for k_ in ("kidney", "bladder", "focus")}, reflux_t=_r(rfx["t"], 2),
+        detect=det,
+        summary={f"{mix:.0f}|{_k(ph)}": {k_: round(v, 4) for k_, v in d.items()} for (mix, ph), d in summary.items()},
+    )
+    return dict(
+        peristalsis=dict(period_s=15.0, wave_speed_cm_s=3.0, bolus_mL=0.25),
+        per_phase={f"mixing x{mix:.0f}, phase {ph:+.1f} s": d for (mix, ph), d in summary.items()},
+        reflux_into_collapsed_kidney_peak_K=float(rfx["samples"]["kidney"].max()),
+        reflux_into_collapsed_bladder_peak_K=float(rfx["samples"]["bladder"].max()),
+        p_correct_antegrade_mean_over_phase=det,
+    )
+
+
+def _bolus_extent(res, i):
+    """[z_low, z_high] in mm of the open lumen around the spot at sample i, or [] if collapsed."""
+    occ, z = res["occ"][i], res["z"] * 1e3
+    if not occ.any():
+        return []
+    idx = np.flatnonzero(occ)
+    return [z[idx[0]], z[idx[-1]]]
+
+
+def plot_c(runs, rfx, phases, summary):
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4.6))
+    ax = axes[0]
+    res = runs[(1.0, 2.5)]
+    occ = res["occ"].T.astype(float)
+    ax.pcolormesh(res["t"], res["z"] * 1e3, occ, cmap="Blues", shading="auto", vmin=0, vmax=2.5)
+    ax.axvspan(0, 5, color="orange", alpha=0.15)
+    for zz, c in ((10, "#c0392b"), (-10, "#2471a3"), (0, "0.4")):
+        ax.axhline(zz, color=c, lw=1, ls="--")
+    ax.set_xlabel("time [s]"); ax.set_ylabel("z [mm] (bladder ↓  kidney ↑)")
+    ax.set_title("Boluses (blue) sweeping past the heated spot")
+
+    ax = axes[1]
+    for ph, c in zip((0.0, 5.0, 10.0), ("#2471a3", "#1abc9c", "#8e44ad")):
+        sm = runs[(1.0, ph)]["samples"]
+        ax.plot(runs[(1.0, ph)]["t"], sm["bladder"], color=c, lw=2, label=f"bolus at spot t={ph:.0f} s")
+        ax.plot(runs[(1.0, ph)]["t"], sm["kidney"], color=c, lw=1, ls=":")
+    ax.axvspan(0, 5, color="orange", alpha=0.12)
+    ax.set_xlabel("time [s]"); ax.set_ylabel("ΔT [K]")
+    ax.set_title("Bladder-side voxel (solid) vs kidney-side (dotted)")
+    ax.legend(fontsize=8)
+
+    ax = axes[2]
+    for mix, ls in ((1.0, "-"), (5.0, "--")):
+        ax.plot(phases, [summary[(mix, ph)]["bladder_peak"] for ph in phases], "o" if mix == 1 else "s", ls=ls,
+                color="#2471a3" if mix == 1 else "#8e44ad", label=f"peristaltic, bolus mixing ×{mix:.0f}")
+    ref = STEADY_REF.get("bladder_peak_0.13")
+    if ref:
+        ax.axhline(ref, color="0.5", ls=":", lw=1)
+        ax.text(phases[0], ref - 0.02, "steady-flow model at the same 1 mL/min", fontsize=8, color="0.4")
+    ax.set_xlabel("time the bolus crosses the spot [s]")
+    ax.set_ylabel("bladder-side peak ΔT [K]")
+    ax.set_title("Downstream signal depends on bolus timing")
+    ax.legend(fontsize=8)
+    fig.suptitle("C. Protocol A in a peristaltic ureter: 0.25 mL boluses every 15 s at 3 cm/s", fontsize=13)
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_c_peristalsis.png", dpi=130)
     plt.close(fig)
 
 
@@ -492,6 +772,8 @@ if __name__ == "__main__":
     results = {"scales": scales()}
     print("Experiment A …")
     results["A_time_of_flight"] = experiment_a()
+    print("Experiment C (peristalsis) …")
+    results["C_peristalsis"] = experiment_c()
     print("Experiment B …")
     results["B_thermal_vcug"] = experiment_b()
     (OUT / "results.json").write_text(json.dumps(results, indent=2))

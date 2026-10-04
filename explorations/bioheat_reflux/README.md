@@ -23,7 +23,7 @@ It tests two protocols:
 | **A** | *Thermal time-of-flight* | 5 s focused heating (for example, focused ultrasound) of a 1.5 mm spot on the ureter | Two thermometry voxels, 10 mm kidney-side and 10 mm bladder-side |
 | **B** | *Thermal VCUG* | Bladder filled with saline a few K warmer or cooler than the body, then the patient voids | Temperature change in the renal pelvis |
 
-Run `python bioheat_reflux.py` (about 40 s, needs numpy/scipy/matplotlib). It writes the
+Run `python bioheat_reflux.py` (about 1 min, needs numpy/scipy/matplotlib). It writes the
 figures below, `results.json` and `thermal_reflux_tracer.html`, an interactive version of
 this write-up built from `page_template.html`.
 
@@ -56,29 +56,87 @@ signal, not which way it points. Two more facts matter:
 - **Faster flow gives a weaker signal.** The heat is spread over more urine, so the bulk
   temperature rise scales roughly as ΔT ≈ P/(ρc·Q). With the gentle pulse (+2 K at the
   focus with no flow), the downstream voxel peaks at:
-  - 0.47 K at 0.13 cm/s
-  - 0.12 K at 2 cm/s
-  - 0.06 K at 5 cm/s
+  - 0.49 K at 0.13 cm/s
+  - 0.13 K at 2 cm/s
+  - 0.07 K at 5 cm/s
 
-  The flow also cools the focus, from 2.8 K down to 0.55 K. That drop is itself a flow
+  The flow also cools the focus, from 2.9 K down to 0.57 K. That drop is itself a flow
   meter, like thermal-clearance anemometry, but it does not give direction.
 - **Detectability** (7 frames at 1 Hz, 5% false-positive rate):
 
   | Pulse | Thermometry noise | Reliable range (≥ 90%) |
   |---|---|---|
-  | +6 K | 0.2 K per frame | 0.13–1 cm/s; 78% at 2 cm/s, 34% at 5 cm/s |
-  | +6 K | 0.5 K per frame (typical MR thermometry) | Never reliable; at most about 86% (at 0.25 cm/s) |
+  | +6 K | 0.2 K per frame | 0.13–1 cm/s; 81% at 2 cm/s, 36% at 5 cm/s |
+  | +6 K | 0.5 K per frame (typical MR thermometry) | Never reliable; at most about 87% (at 0.25 cm/s) |
 
   The +6 K pulse briefly brings tissue to about 43–45 °C. Its thermal dose is
-  **CEM43 = 0.22 min**, compared with roughly 240 min for damage to muscle and fat.
+  **CEM43 = 0.28 min**, compared with roughly 240 min for damage to muscle and fat.
   The gentle +2 K pulse gives 0.001 min.
 - **"Heat, then wait" works better than heating flowing urine** (figure below). Heating the
   urine while it is still, then letting the first reflux jet push the warm slug past the
-  sensor, gives a **0.57 K** spike on the kidney side only, even with the gentle pulse.
+  sensor, gives a **0.58 K** spike on the kidney side only, even with the gentle pulse.
   However, the spike lasts less than 1 s, so the readout needs a frame rate of about 5 Hz or
   faster.
 
 ![A'](fig_a_pulse.png)
+
+## C. Protocol A in a peristaltic ureter
+
+![C](fig_c_peristalsis.png)
+
+Protocol A above treats the ureter as an open tube with steady flow. A real ureter is
+mostly collapsed: urine moves down it as discrete boluses carried by contraction waves.
+`simulate_peristaltic` models this as follows:
+
+- **Collapsed segments** behave like wall tissue, with no urine and no flow.
+- **Each bolus** is a 0.25 mL plug of urine, about 2 cm long. A new bolus comes every
+  15 s (4 per minute), moving towards the bladder at 3 cm/s. Together these give the same
+  1 mL/min as the steady 0.13 cm/s case.
+- **Energy is conserved.** When a bolus opens a segment, the folded wall's heat moves
+  outward into the wall, and it moves back when the segment collapses. A check run
+  conserves energy to within 0.03% as a bolus passes.
+- **Mixing inside the bolus** is bracketed. The ×1 case has no internal recirculation; the
+  ×5 case multiplies the bolus's thermal conductivity by 5 to mimic trapped vortices.
+- **Bolus timing** is swept over six phases, because the bolus timing relative to the
+  heating pulse is not controlled.
+
+Findings (gentle +2 K pulse unless stated):
+
+- **Direction stays unambiguous.** Antegrade boluses carry heat only to the bladder side.
+  The kidney-side voxel never exceeds 0.002 K.
+- **The signal is 2–4× smaller and arrives in bursts.** The bladder-side voxel peaks at
+  **0.12–0.25 K** with no mixing and **0.19–0.33 K** with ×5 mixing. That compares with
+  **0.49 K** for steady flow at the same urine output. Each peak arrives when a bolus
+  passes, which can be up to one period (15 s) after heating stops.
+- **The collapsed wall stores heat for the next bolus.** A bolus that passes during
+  heating can carry away less than the one after it. While the segment is closed, heat
+  builds up in still tissue, and the next bolus collects it.
+- **Detection gets harder.** Bolus timing is unknown, so the test uses all 30 one-second
+  frames (each averaged over its acquisition) and averages over the six timings:
+
+  | Pulse | Noise | P(correct antegrade call) | Steady-flow model at 0.13 cm/s (7-frame window) |
+  |---|---|---|---|
+  | +6 K | 0.2 K | 80–85% | 99% |
+  | +6 K | 0.5 K | 28–31% | 49% |
+  | +2 K | 0.2 K | 22–24% | 39% |
+
+- **Reflux detection holds up, and slightly improves.** If urine refluxes into a ureter
+  that was collapsed while it was heated (2 s jet at 3 cm/s), the kidney-side voxel peaks
+  at **0.63 K**, against 0.58 K in the open-tube model. The bladder side reaches 0.001 K.
+  The jet distends the ureter and sweeps up the heat stored in the wall.
+- **What this means in practice.** Sensing normal antegrade flow is the hard case;
+  sensing reflux is not. A clinical protocol would want one of these:
+  - **Gate the readout to peristalsis**, for example with cine MRI or ultrasound to see
+    when each bolus passes.
+  - **Heat gently through a whole peristaltic cycle** instead of using one 5 s pulse.
+  - **Rely on the voiding phase**, when reflux distends the ureter.
+
+Limitations of this extension:
+
+- **The bolus is idealised.** It is a rigid plug with a fixed length, speed and period,
+  moving through a fixed grid. The wall does not actually deform.
+- **Peristalsis stops once a reflux column fills the ureter.**
+- **Bolus mixing is only bracketed** (×1 and ×5), not resolved.
 
 ## B. Thermal VCUG
 
@@ -120,8 +178,9 @@ signal, not which way it points. Two more facts matter:
 3. **The main risks the model leaves out:**
    - **Motion during voiding** corrupts PRF-shift thermometry. This is probably the biggest
      practical problem.
-   - **The ureter is not a steady tube.** It collapses between peristaltic boluses, and a
-     collapsed lumen carries no advected heat.
+   - **Peristalsis is idealised** (section C). Rigid boluses at a fixed rate cut the
+     antegrade signal 2–4× and make its timing unpredictable. Reflux detection is not
+     hurt.
    - **Fat** has no PRF thermometry signal, and the renal sinus is fatty.
    - **Kidney cortex perfusion** is about 100× higher than the tissue value used here. This
      matters only if the refluxed urine sits right against the parenchyma.
@@ -130,8 +189,9 @@ signal, not which way it points. Two more facts matter:
 
 ## Possible next steps
 
-- Fit the model to published ureteral peristalsis data (bolus volume, frequency and
-  collapse), and replace steady Poiseuille flow with travelling boluses.
+- Fit the bolus model to measured ureteral peristalsis (frequency against diuresis, wave
+  speed, bolus shape) and sweep those values. Also model peristalsis that keeps running
+  after a reflux event.
 - Simulate the full chain: bladder heat loss during filling and voiding, then the real
   renal-pelvis shape from a segmented MR or CT scan.
 - Model ultrasound echo-shift thermometry. It would fit a ceVUS-like bedside workflow if

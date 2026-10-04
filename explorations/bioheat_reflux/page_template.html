@@ -208,7 +208,7 @@ footer { border-top: 1px solid var(--rule); padding-top: 1.25rem; font-size: .9r
     <div class="facts">
       <div class="fact"><span class="v num">90 – 3,500</span><span class="k">Péclet number over 10 mm. Moving urine carries heat far further than it diffuses.</span></div>
       <div class="fact"><span class="v num">0.004 K</span><span class="k">Rise 10 mm away with no flow. Without flow, the sensors stay flat.</span></div>
-      <div class="fact"><span class="v num">0.22 min</span><span class="k">Thermal dose (CEM43) of the stronger +6 K pulse, against ~240 min for tissue damage.</span></div>
+      <div class="fact"><span class="v num">0.28 min</span><span class="k">Thermal dose (CEM43) of the stronger +6 K pulse, against ~240 min for tissue damage.</span></div>
       <div class="fact"><span class="v num">0.3 – 1.4 K</span><span class="k">Bladder-fill offset MR thermometry needs to see 5 to 0.5 mL of reflux.</span></div>
     </div>
   </section>
@@ -271,13 +271,62 @@ footer { border-top: 1px solid var(--rule); padding-top: 1.25rem; font-size: .9r
     <div class="read stack" style="margin-inline:0">
       <span class="eyebrow">Protocol A · variant</span>
       <h2>Heat the still urine first, then wait for the jet</h2>
-      <p>Heating urine that is already moving spreads the heat thin. If the spot is heated while the urine is still, the first reflux jet pushes the whole warm slug past the kidney-side voxel. With only the gentle pulse, that gives a 0.57 K spike on the kidney side and nothing on the bladder side. The spike lasts under a second, so the readout has to sample at about 5 Hz or faster.</p>
+      <p>Heating urine that is already moving spreads the heat thin. If the spot is heated while the urine is still, the first reflux jet pushes the whole warm slug past the kidney-side voxel. With only the gentle pulse, that gives a 0.58 K spike on the kidney side and nothing on the bladder side. The spike lasts under a second, so the readout has to sample at about 5 Hz or faster.</p>
     </div>
     <figure>
       <figcaption class="fig-title">2 s reflux jet at 3 cm/s (≈0.75 mL), arriving at t = 4 s</figcaption>
       <div class="legend" id="pulse-legend"></div>
       <div class="chart" id="pulse-chart"></div>
     </figure>
+  </section>
+
+  <section class="wide stack" style="gap:1.5rem" id="peristalsis">
+    <div class="read stack" style="margin-inline:0">
+      <span class="eyebrow">Protocol A · realistic peristalsis</span>
+      <h2>Real ureters move urine in boluses</h2>
+      <p>The ureter is mostly collapsed. Urine moves down it as discrete boluses carried by contraction waves. Here each bolus is 0.25 mL (about 2 cm of lumen), one arrives every 15 s, and each travels towards the bladder at 3 cm/s. That is the same 1 mL/min as the steady 0.13 cm/s case. Collapsed segments behave like wall tissue, and opening and closing conserve energy. Because the bolus timing relative to the heating pulse is not controlled, six timings are simulated.</p>
+    </div>
+    <div class="controls">
+      <div class="stack" style="gap:.35rem">
+        <span class="seg-label" id="ph-label">Bolus crosses the heated spot at</span>
+        <div class="seg" role="group" aria-labelledby="ph-label" id="ph-seg"></div>
+      </div>
+      <div class="stack" style="gap:.35rem">
+        <span class="seg-label" id="mix-label">Mixing inside the bolus</span>
+        <div class="seg" role="group" aria-labelledby="mix-label">
+          <button type="button" id="mix-1" aria-pressed="true">none</button>
+          <button type="button" id="mix-5" aria-pressed="false">×5</button>
+        </div>
+      </div>
+    </div>
+    <div class="fig-grid two">
+      <figure>
+        <figcaption class="fig-title" id="per-title">Voxel traces, +2 K pulse</figcaption>
+        <div class="legend" id="per-legend"></div>
+        <div class="chart" id="per-chart"></div>
+        <p class="caption">Shaded: a bolus is at the heated spot. Every bump on the bladder side is a bolus passing the voxel.</p>
+      </figure>
+      <figure>
+        <figcaption class="fig-title">Bladder-side peak against bolus timing</figcaption>
+        <div class="legend" id="pk-legend"></div>
+        <div class="chart" id="pk-chart"></div>
+        <p class="caption">The dashed grey line is the steady-flow model at the same urine output.</p>
+      </figure>
+    </div>
+    <div class="read stack" style="margin-inline:0">
+      <ul class="plain">
+        <li><strong>Direction is still unambiguous.</strong> The kidney-side voxel never exceeds 0.002 K under antegrade peristalsis.</li>
+        <li><strong>The signal is 2–4× smaller and arrives in bursts</strong>, up to one period after heating stops. While a segment is closed, heat builds up in still tissue, and the next bolus can carry away more than the one that passed during heating.</li>
+        <li><strong>Reflux detection holds up.</strong> A 2 s reflux jet into a ureter that was collapsed while heated gives a <span class="num">0.63 K</span> kidney-side peak (0.58 K in the open-tube model) and 0.001 K on the bladder side. The jet sweeps up the heat stored in the wall.</li>
+      </ul>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pulse · noise</th><th>Peristaltic<br>30 × 1 s frames</th><th>Steady flow, 0.13 cm/s<br>7 frames</th></tr></thead>
+          <tbody id="per-det"></tbody>
+        </table>
+      </div>
+      <p class="muted">Chance of a correct antegrade call, averaged over bolus timing. Ranges span no mixing to ×5 mixing. A clinical protocol would gate the readout to peristalsis, heat gently through a whole cycle, or rely on the voiding phase, when reflux distends the ureter.</p>
+    </div>
   </section>
 
   <section class="wide stack" style="gap:1.5rem">
@@ -333,7 +382,7 @@ footer { border-top: 1px solid var(--rule); padding-top: 1.25rem; font-size: .9r
     <h3>What the model leaves out</h3>
     <ul class="plain">
       <li><strong>Motion during voiding</strong> corrupts MR (PRF-shift) thermometry. This is probably the biggest practical problem.</li>
-      <li><strong>The ureter is not a steady tube.</strong> It collapses between peristaltic boluses, and a collapsed lumen carries no heat.</li>
+      <li><strong>Peristalsis is idealised.</strong> Boluses are rigid plugs at a fixed rate, in a grid whose wall does not actually deform.</li>
       <li><strong>Fat gives no PRF thermometry signal</strong>, and the renal sinus is fatty.</li>
       <li><strong>Kidney cortex perfusion</strong> is about 100× the tissue value used here. It matters only if refluxed urine sits against the parenchyma.</li>
       <li><strong>Contrast ultrasound already avoids radiation.</strong> A thermal method would compete on needing no agent at all and on estimating volume.</li>
@@ -657,6 +706,79 @@ footer { border-top: 1px solid var(--rule); padding-top: 1.25rem; font-size: .9r
     bands: [{ x0: 0, x1: 4, fill: "var(--s2)", opacity: 0.07, label: "heating" }, { x0: 4, x1: 6, fill: "var(--accent)", opacity: 0.14, label: "jet" }],
     series: pS,
   });
+
+  // ---------------- peristalsis ----------------
+  const C = D.C;
+  let phase = 2.5, mix = 1;
+  const phSeg = document.getElementById("ph-seg");
+  C.phases.forEach((ph) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = `${ph > 0 ? "+" : ""}${ph} s`;
+    b.setAttribute("aria-pressed", String(ph === phase));
+    b.addEventListener("click", () => {
+      phase = ph;
+      [...phSeg.children].forEach((x, i) => x.setAttribute("aria-pressed", String(C.phases[i] === ph)));
+      perChart.update(perCfg());
+    });
+    phSeg.appendChild(b);
+  });
+  for (const [id, mval] of [["mix-1", 1], ["mix-5", 5]]) {
+    document.getElementById(id).addEventListener("click", () => {
+      mix = mval;
+      document.getElementById("mix-1").setAttribute("aria-pressed", String(mval === 1));
+      document.getElementById("mix-5").setAttribute("aria-pressed", String(mval === 5));
+      perChart.update(perCfg());
+    });
+  }
+  legend(document.getElementById("per-legend"), [S_K, S_B]);
+  function bolusBands() {
+    // contiguous 0.2-s samples where the open lumen covers the heated spot (|z| < 1.5 mm)
+    const ext = C.bolus[String(phase)], bands = [];
+    let start = null;
+    ext.forEach((e, i) => {
+      const on = e.length === 2 && e[0] <= 1.5 && e[1] >= -1.5;
+      const t = C.t[i];
+      if (on && start === null) start = t;
+      if (!on && start !== null) { bands.push({ x0: start, x1: t, fill: "var(--accent)", opacity: 0.16 }); start = null; }
+    });
+    if (start !== null) bands.push({ x0: start, x1: 30, fill: "var(--accent)", opacity: 0.16 });
+    return bands;
+  }
+  function perCfg() {
+    const tr = C.traces[`${mix}|${phase}`];
+    return {
+      aria: `Voxel traces with peristaltic boluses, bolus at spot t = ${phase} s`,
+      x: { min: 0, max: 30, ticks: [0, 5, 10, 15, 20, 25, 30], label: "time (s)", tipFmt: (t) => `t = ${t.toFixed(1)} s` },
+      y: { min: 0, max: 0.35, ticks: [0, 0.1, 0.2, 0.3], label: "ΔT (K)", tipFmt: (y) => `${y.toFixed(3)} K` },
+      bands: [{ x0: 0, x1: 5, fill: "var(--s2)", opacity: 0.07, label: "heating" }, ...bolusBands()],
+      series: [
+        { ...S_K, xs: C.t, ys: tr.kidney },
+        { ...S_B, xs: C.t, ys: tr.bladder },
+      ],
+    };
+  }
+  const perChart = lineChart(document.getElementById("per-chart"), perCfg());
+  const pkS = [
+    { name: "no mixing", color: "var(--s1)", xs: C.phases, ys: C.phases.map((ph) => C.summary[`1|${ph}`].bladder_peak), markers: true },
+    { name: "×5 mixing", color: "var(--s2)", xs: C.phases, ys: C.phases.map((ph) => C.summary[`5|${ph}`].bladder_peak), markers: true },
+    { name: "steady flow, same output", color: "var(--s-neutral)", dash: "5 4", w: 1.5, xs: C.phases, ys: C.phases.map(() => C.steady_ref) },
+  ];
+  legend(document.getElementById("pk-legend"), pkS);
+  lineChart(document.getElementById("pk-chart"), {
+    aria: "Bladder-side peak temperature against bolus timing",
+    x: { min: -3, max: 10.5, ticks: [-2.5, 0, 2.5, 5, 7.5, 10], label: "bolus crosses the spot at (s)", tipFmt: (v) => `bolus at t = ${v} s` },
+    y: { min: 0, max: 0.6, ticks: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6], label: "peak ΔT (K)", tipFmt: (y) => `${y.toFixed(3)} K` },
+    series: pkS,
+  });
+  const detBody = document.getElementById("per-det");
+  const steadyIdx = vels.indexOf(-0.13);
+  for (const [g, sg] of [["6K", 0.2], ["6K", 0.5], ["2K", 0.2], ["2K", 0.5]]) {
+    const r = detBody.insertRow();
+    const pct = (v) => `${Math.round(v * 100)}%`;
+    const a = C.detect[`${g}|${sg}|x1`], b = C.detect[`${g}|${sg}|x5`];
+    [`+${g[0]} K · σ ${sg} K`, pct(a) === pct(b) ? pct(a) : `${pct(Math.min(a, b))}–${pct(Math.max(a, b))}`, pct(A.detect[`${g}|${sg}`][steadyIdx])]
+      .forEach((txt, i) => { const c = r.insertCell(); if (i) c.className = "n"; c.textContent = txt; });
+  }
 
   // ---------------- protocol B ----------------
   const B = D.B;
